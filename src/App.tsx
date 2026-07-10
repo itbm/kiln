@@ -2,9 +2,11 @@ import { useEffect } from "react"
 import { Route, Routes } from "react-router-dom"
 import { Toaster } from "@/components/ui/sonner"
 import { DialogHost } from "@/stores/dialogs"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { useApplyTheme, useIsDark } from "@/hooks/use-theme"
 import { recoverInterrupted } from "@/lib/db"
 import { clearBadge } from "@/lib/notify"
+import { requestPersistentStorage, setupServiceWorker } from "@/lib/sw"
 import { useModels } from "@/stores/models"
 import ChatPage from "@/pages/ChatPage"
 import ImagesPage from "@/pages/ImagesPage"
@@ -23,8 +25,10 @@ export default function App() {
       }
       void recoverInterrupted()
       void useModels.getState().refresh()
+      void requestPersistentStorage()
     }
     void boot()
+    setupServiceWorker()
     clearBadge()
     const onVisible = () => {
       if (document.visibilityState === "visible") clearBadge()
@@ -34,7 +38,7 @@ export default function App() {
   }, [])
 
   return (
-    <>
+    <ErrorBoundary>
       <Routes>
         <Route path="/" element={<ChatPage />} />
         <Route path="/chat/:chatId" element={<ChatPage />} />
@@ -45,6 +49,6 @@ export default function App() {
       </Routes>
       <Toaster position="top-center" theme={isDark ? "dark" : "light"} />
       <DialogHost />
-    </>
+    </ErrorBoundary>
   )
 }

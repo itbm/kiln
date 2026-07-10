@@ -12,7 +12,20 @@ Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
 ## Features
 
 - **Chat & history** — streaming markdown chat with code highlighting, tables,
-  chat list grouped by day, search, rename, delete, export/import (JSON).
+  chat list grouped by day, rename, delete, export/import (JSON), and
+  **full-text search** across every message (with snippets).
+- **Context management** — a chars-based token estimate of every request;
+  when a chat nears the model's context limit it is **auto-compacted**
+  (older messages summarised by your utility model, newer ones kept
+  verbatim). Messages stay visible — a divider marks what's summarised.
+  A meter pill appears at 60% usage for one-tap compaction.
+- **Slash commands** — type `/` in the composer: `/compact [focus]`,
+  `/clear` (fresh context, messages kept), `/title`, `/model`, `/effort`,
+  `/export`, `/help`.
+- **Message editing & versions** — edit any of your messages and resend
+  (later messages are replaced after a confirm); regenerating a reply keeps
+  every attempt with a Claude-style ‹ 1/2 › version switcher, including
+  when you switch model between attempts.
 - **Artifacts** — the assistant can emit Markdown documents, self-contained
   HTML pages, code files and SVGs as tappable cards with a full-screen
   viewer: rendered preview (sandboxed iframe for HTML/SVG), source view,
@@ -45,8 +58,13 @@ Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
 - **Image generation** — a separate Images studio optimised for generating
   and browsing pictures with image-output models (e.g. Gemini Flash Image
   on OpenRouter), with full-screen viewing and download.
+- **Model favourites** — star models in the picker to pin them to a
+  Favourites group at the top.
 - **PWA** — installable, offline app shell, light/dark (or follow system),
-  safe-area aware, iOS keyboard-friendly.
+  safe-area aware, iOS keyboard-friendly. Requests **persistent storage**
+  so the browser won't evict your chats, shows storage usage in Settings,
+  prompts with an "Update" toast when a new version is deployed, and a
+  crash screen (error boundary) protects against white-screens.
 - **Notifications** — optional "reply finished" notification + app badge
   when the app is in the background.
 - **Resilient streaming** — every chunk is persisted to IndexedDB as it

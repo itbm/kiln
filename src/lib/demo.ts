@@ -85,6 +85,11 @@ export async function seedDemo(): Promise<void> {
     ...settings.state,
     lastModel: { provider: "openrouter", model: "anthropic/claude-sonnet-4.5" },
     lastImageModel: { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
+    favoriteModels: [
+      "openrouter:anthropic/claude-sonnet-4.5",
+      "ollama:gpt-oss:120b",
+      "openrouter:google/gemini-2.5-flash",
+    ],
     skills: settings.state.skills?.length
       ? settings.state.skills
       : [
@@ -153,6 +158,19 @@ export async function seedDemo(): Promise<void> {
         role: "assistant",
         modelName: "Claude Sonnet 4.5",
         effort: "auto",
+        versions: [
+          {
+            content:
+              "Here's a quick outline for 5 days: Higashiyama temples, Arashiyama bamboo, a Kurama day-hike, Nishiki market food crawl, and a flexible last day around Fushimi Inari. Want me to expand it into a full plan?",
+            provider: "openrouter",
+            model: "google/gemini-2.5-flash",
+            modelName: "Gemini 2.5 Flash",
+            effort: "auto",
+            status: "done",
+            createdAt: now - 0.62 * H,
+          },
+        ],
+        versionIndex: 1,
         reasoning:
           "The user prefers walking, temples, food, quiet areas. Cluster geographically to minimise transit: Higashiyama day, Arashiyama day, north Kyoto (Kurama/Kibune) for autumn colour, downtown market day, and a flexible finale. Late October = early koyo in the hills, comfortable 12–20°C.",
         reasoningMs: 4200,
@@ -255,6 +273,9 @@ The palette leans on ember-orange against oak browns. Tap the card to preview it
       provider: "ollama",
       model: "gpt-oss:120b",
       effort: "high",
+      summary:
+        "- User is cleaning sales.csv: mixed US/ISO dates, £/$ symbols in amount column\n- Wants pandas; prefers concise answers",
+      summaryCutoff: now - 26.2 * H,
     },
     [
       {

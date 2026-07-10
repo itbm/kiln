@@ -42,3 +42,32 @@ export async function chatMessages(chatId: string): Promise<Message[]> {
   const msgs = await db.messages.where("chatId").equals(chatId).toArray()
   return msgs.sort((a, b) => a.createdAt - b.createdAt)
 }
+
+/**
+ * Full-text search across message content. Returns one snippet per chat
+ * (first match), capped for phone-scale responsiveness.
+ */
+export async function searchMessages(
+  query: string,
+): Promise<Map<string, string>> {
+  const needle = query.toLowerCase()
+  const hits = new Map<string, string>()
+  if (!needle) return hits
+  const matches = await db.messages
+    .filter((m) => (m.content ?? "").toLowerCase().includes(needle))
+    .limit(200)
+    .toArray()
+  for (const m of matches) {
+    if (hits.has(m.chatId)) continue
+    const lower = m.content.toLowerCase()
+    const i = lower.indexOf(needle)
+    const start = Math.max(0, i - 28)
+    const end = Math.min(m.content.length, i + needle.length + 48)
+    const snippet =
+      (start > 0 ? "…" : "") +
+      m.content.slice(start, end).replace(/\s+/g, " ").trim() +
+      (end < m.content.length ? "…" : "")
+    hits.set(m.chatId, snippet)
+  }
+  return hits
+}

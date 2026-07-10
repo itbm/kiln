@@ -36,6 +36,9 @@ export interface Chat {
   temporary?: boolean
   titleIsManual?: boolean
   titleGenerated?: boolean
+  /** compaction: summary of messages with createdAt <= summaryCutoff */
+  summary?: string
+  summaryCutoff?: number
 }
 
 export type AttachmentKind = "image" | "text" | "pdf"
@@ -80,6 +83,27 @@ export interface Message {
   reasoningMs?: number
   steps?: ToolStep[]
   attachments?: Attachment[]
+  images?: GenImage[]
+  provider?: ProviderId
+  model?: string
+  modelName?: string
+  effort?: Effort
+  status: MessageStatus
+  error?: string
+  createdAt: number
+  editedAt?: number
+  /** alternative generations (regenerations); active one lives on the message itself */
+  versions?: Generation[]
+  /** position of the active generation in the full ordering; defaults to versions.length */
+  versionIndex?: number
+}
+
+/** A snapshot of one assistant generation, for the version switcher. */
+export interface Generation {
+  content: string
+  reasoning?: string
+  reasoningMs?: number
+  steps?: ToolStep[]
   images?: GenImage[]
   provider?: ProviderId
   model?: string

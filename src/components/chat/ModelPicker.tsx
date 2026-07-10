@@ -7,6 +7,7 @@ import {
   KeyIcon,
   Loader2Icon,
   RefreshCwIcon,
+  StarIcon,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import {
@@ -44,21 +45,47 @@ function priceLabel(m: ModelInfo): string {
   return `$${p < 0.1 ? p.toFixed(2) : p.toFixed(p < 10 ? 1 : 0)}/M`
 }
 
+export const modelKey = (m: { provider: string; id: string }) =>
+  `${m.provider}:${m.id}`
+
 function ModelRow({
   m,
   selected,
+  favorite,
+  group,
   onSelect,
+  onToggleFavorite,
 }: {
   m: ModelInfo
   selected: boolean
+  favorite: boolean
+  group: string
   onSelect: () => void
+  onToggleFavorite: () => void
 }) {
   return (
     <CommandItem
-      value={`${m.provider} ${m.id} ${m.name}`}
+      value={`${group} ${m.provider} ${m.id} ${m.name}`}
       onSelect={onSelect}
-      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5"
+      className="flex items-center gap-2 rounded-xl px-1.5 py-2.5"
     >
+      <button
+        aria-label={favorite ? "Remove from favourites" : "Add to favourites"}
+        className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 active:scale-90"
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          onToggleFavorite()
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <StarIcon
+          className={cn(
+            "size-4",
+            favorite && "fill-primary stroke-primary",
+          )}
+        />
+      </button>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="truncate text-[14px] font-medium">{m.name}</span>
@@ -97,6 +124,8 @@ export function ModelPicker({
   const { openrouter, ollama, loading, errors, fetchedAt, refresh } = useModels()
   const hasOllamaKey = useSettings((s) => !!s.ollamaKey)
   const hasOpenrouterKey = useSettings((s) => !!s.openrouterKey)
+  const favorites = useSettings((s) => s.favoriteModels)
+  const toggleFavorite = useSettings((s) => s.toggleFavoriteModel)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -106,9 +135,14 @@ export function ModelPicker({
   const filter = (list: ModelInfo[]) =>
     imageOnly ? list.filter((m) => m.imageOutput) : list
 
-  const groups: { name: string; models: ModelInfo[]; hasKey: boolean }[] = [
-    { name: PROVIDER_NAMES.ollama, models: filter(ollama), hasKey: hasOllamaKey },
-    { name: PROVIDER_NAMES.openrouter, models: filter(openrouter), hasKey: hasOpenrouterKey },
+  const favModels = filter([...ollama, ...openrouter]).filter((m) =>
+    favorites.includes(modelKey(m)),
+  )
+
+  const groups: { name: string; models: ModelInfo[] }[] = [
+    { name: "Favourites", models: favModels },
+    { name: PROVIDER_NAMES.ollama, models: filter(ollama) },
+    { name: PROVIDER_NAMES.openrouter, models: filter(openrouter) },
   ]
 
   const pick = (m: ModelInfo) => {
@@ -149,12 +183,15 @@ export function ModelPicker({
                 <CommandGroup key={g.name} heading={g.name}>
                   {g.models.map((m) => (
                     <ModelRow
-                      key={`${m.provider}/${m.id}`}
+                      key={`${g.name}/${m.provider}/${m.id}`}
                       m={m}
+                      group={g.name}
                       selected={
                         value?.provider === m.provider && value?.model === m.id
                       }
+                      favorite={favorites.includes(modelKey(m))}
                       onSelect={() => pick(m)}
+                      onToggleFavorite={() => toggleFavorite(modelKey(m))}
                     />
                   ))}
                 </CommandGroup>

@@ -26,9 +26,12 @@ interface SettingsState {
   lastModel: ModelRef | null
   lastEffort: Effort
   lastImageModel: ModelRef | null
-  /** null = use the chat's own model for titles */
+  /** null = use the chat's own model (utility model: titles + compaction) */
   titleModel: ModelRef | null
   generateTitles: boolean
+  autoCompact: boolean
+  /** "provider:modelId" keys */
+  favoriteModels: string[]
   notifications: boolean
   keepAwake: boolean
   webSearchEnabled: boolean
@@ -40,6 +43,7 @@ interface SettingsState {
   addSkill: (s: Omit<Skill, "id">) => void
   updateSkill: (id: string, patch: Partial<Skill>) => void
   removeSkill: (id: string) => void
+  toggleFavoriteModel: (key: string) => void
 }
 
 export const useSettings = create<SettingsState>()(
@@ -58,6 +62,8 @@ export const useSettings = create<SettingsState>()(
       lastImageModel: null,
       titleModel: null,
       generateTitles: true,
+      autoCompact: true,
+      favoriteModels: [],
       notifications: false,
       keepAwake: false,
       webSearchEnabled: true,
@@ -74,6 +80,12 @@ export const useSettings = create<SettingsState>()(
         })),
       removeSkill: (id) =>
         set((st) => ({ skills: st.skills.filter((s) => s.id !== id) })),
+      toggleFavoriteModel: (key) =>
+        set((st) => ({
+          favoriteModels: st.favoriteModels.includes(key)
+            ? st.favoriteModels.filter((k) => k !== key)
+            : [...st.favoriteModels, key],
+        })),
     }),
     { name: "amber-settings" },
   ),

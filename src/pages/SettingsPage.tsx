@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   ArrowLeftIcon,
@@ -42,6 +42,7 @@ import { checkOllamaKey } from "@/lib/providers/ollama"
 import { ensureNotificationPermission } from "@/lib/notify"
 import { exportAllData, importData } from "@/lib/sync"
 import type { Skill } from "@/lib/types"
+import { formatBytes } from "@/lib/utils"
 import { confirmDialog } from "@/stores/dialogs"
 import { displayModelName } from "@/stores/models"
 import { useSettings, type ThemePref } from "@/stores/settings"
@@ -208,6 +209,37 @@ function SkillDialog({
   )
 }
 
+function StorageInfo() {
+  const [info, setInfo] = useState<{
+    used: number
+    quota: number
+    persisted: boolean
+  } | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const est = await navigator.storage?.estimate?.()
+        const persisted = (await navigator.storage?.persisted?.()) ?? false
+        setInfo({ used: est?.usage ?? 0, quota: est?.quota ?? 0, persisted })
+      } catch {
+        /* unsupported */
+      }
+    })()
+  }, [])
+  if (!info) return null
+  return (
+    <p className="text-[12px] text-muted-foreground">
+      Storage used: {formatBytes(info.used)}
+      {info.quota ? ` of ~${formatBytes(info.quota)}` : ""} ·{" "}
+      {info.persisted ? (
+        <span className="text-primary">protected from eviction ✓</span>
+      ) : (
+        "eviction protection not granted (install the app to improve this)"
+      )}
+    </p>
+  )
+}
+
 function ToggleRow({
   title,
   description,
@@ -314,17 +346,24 @@ export default function SettingsPage() {
             checked={s.generateTitles}
             onCheckedChange={(v) => s.set({ generateTitles: v })}
           />
-          {s.generateTitles && (
+          <ToggleRow
+            title="Auto-compact long chats"
+            description="Summarises older messages when a chat nears the model's context limit"
+            checked={s.autoCompact}
+            onCheckedChange={(v) => s.set({ autoCompact: v })}
+          />
+          {(s.generateTitles || s.autoCompact) && (
             <button
               onClick={() => setTitlePickerOpen(true)}
               className="flex w-full items-center justify-between rounded-xl border border-border p-3 text-left"
             >
               <div>
-                <div className="text-[13.5px] font-medium">Title model</div>
+                <div className="text-[13.5px] font-medium">Utility model</div>
                 <div className="text-[12px] text-muted-foreground">
                   {s.titleModel
                     ? displayModelName(s.titleModel)
-                    : "Same model as the chat"}
+                    : "Same model as the chat"}{" "}
+                  · used for titles & compaction
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -608,6 +647,7 @@ export default function SettingsPage() {
               e.target.value = ""
             }}
           />
+          <StorageInfo />
           <p className="text-[12px] text-muted-foreground">
             Everything lives in your browser’s storage on this device. Export regularly if
             the chats matter to you.

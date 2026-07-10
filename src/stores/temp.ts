@@ -10,6 +10,7 @@ interface TempState {
   putChat: (chat: Chat) => void
   patchChat: (id: string, patch: Partial<Chat>) => void
   putMessage: (msg: Message) => void
+  deleteMessages: (chatId: string, ids: string[]) => void
   remove: (id: string) => void
   /** persist a temporary chat into IndexedDB */
   saveToHistory: (id: string) => Promise<void>
@@ -42,6 +43,16 @@ export const useTemp = create<TempState>()((set, get) => ({
           : [...list, msg]
       return { messages: { ...st.messages, [msg.chatId]: next } }
     }),
+
+  deleteMessages: (chatId, ids) =>
+    set((st) => ({
+      messages: {
+        ...st.messages,
+        [chatId]: (st.messages[chatId] ?? []).filter(
+          (m) => !ids.includes(m.id),
+        ),
+      },
+    })),
 
   remove: (id) =>
     set((st) => {

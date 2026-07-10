@@ -51,6 +51,12 @@ const round2 = sse([
 // Title call
 const titleResp = sse([chunk({ content: "Espresso bean picks" }), chunk({}, "stop")])
 
+// Compaction call
+const summaryResp = sse([
+  chunk({ content: "- User wants espresso bean advice; fresh roast date matters most" }),
+  chunk({}, "stop"),
+])
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
 })
@@ -73,7 +79,8 @@ await page.addInitScript(() => {
         id: "anthropic/claude-sonnet-4.5",
         name: "Claude Sonnet 4.5",
         provider: "openrouter",
-        ctx: 1000000,
+        // tiny context so the auto-compaction path triggers in this test
+        ctx: 700,
         vision: true,
         reasoning: true,
         tools: true,
@@ -104,9 +111,17 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
   const body = JSON.parse(route.request().postData() ?? "{}")
   bodies.push(body)
   orCalls++
-  const isTitle = body.messages?.[0]?.content?.includes("short titles")
+  const system = body.messages?.[0]?.content ?? ""
+  const isTitle = system.includes("short titles")
+  const isSummary = system.includes("compress chat conversations")
   const hasToolResult = body.messages?.some((m) => m.role === "tool")
-  const payload = isTitle ? titleResp : hasToolResult ? round2 : round1
+  const payload = isTitle
+    ? titleResp
+    : isSummary
+      ? summaryResp
+      : hasToolResult
+        ? round2
+        : round1
   await route.fulfill({
     status: 200,
     headers: { "content-type": "text/event-stream" },
@@ -153,6 +168,56 @@ await page.reload({ waitUntil: "networkidle" })
 await page.getByText("Searched “best espresso beans 2026”").waitFor({ timeout: 10000 })
 await page.getByText("Espresso beans — quick guide").waitFor({ timeout: 5000 })
 await page.getByText(/Thought for/).waitFor({ timeout: 5000 })
+
+// --- regenerate keeps the old attempt as a version ---
+await page.getByLabel("Regenerate").click()
+await page.getByText("2/2").waitFor({ timeout: 15000 })
+await page.getByLabel("Previous version").click()
+await page.getByText("1/2").waitFor({ timeout: 5000 })
+await page.getByLabel("Next version").click()
+await page.getByText("2/2").waitFor({ timeout: 5000 })
+console.log("ok: regenerate created version 2/2 and switcher works")
+await page.screenshot({ path: "shots/e2e-versions.png" })
+
+// --- /help command ---
+await page.getByPlaceholder("Message Amber…").fill("/help")
+await page.getByLabel("Send").click()
+await page.getByText("Slash commands").waitFor({ timeout: 5000 })
+await page.getByRole("button", { name: "OK" }).click()
+console.log("ok: /help dialog")
+
+// --- second send triggers auto-compaction (ctx=700 in the mock model) ---
+await page.getByPlaceholder("Message Amber…").fill("And which grinder should I get?")
+await page.getByLabel("Send").click()
+await page
+  .getByText(/Compacted — messages above are summarised/)
+  .waitFor({ timeout: 20000 })
+console.log("ok: auto-compaction divider appeared")
+const compactionCall = bodies.find((b) =>
+  b.messages?.[0]?.content?.includes("compress chat conversations"),
+)
+const afterCompact = bodies[bodies.length - 1]
+console.log(
+  "ok: summary injected into system prompt:",
+  afterCompact.messages[0].content.includes("fresh roast date matters most"),
+)
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 15000 })
+
+// --- edit a user message and resend ---
+await page.getByLabel("Edit message").first().click()
+const editBox = page.locator("textarea").first()
+await editBox.fill("What espresso beans should I buy for a Moka pot?")
+await page.getByText("Send", { exact: true }).click()
+await page.getByRole("button", { name: "Edit & resend" }).click()
+await page.getByText("What espresso beans should I buy for a Moka pot?").waitFor({ timeout: 10000 })
+await page.getByText("edited").first().waitFor({ timeout: 15000 })
+console.log("ok: user message edited and regenerated")
+await page.waitForTimeout(1500)
+await page.screenshot({ path: "shots/e2e-edited.png" })
+if (!compactionCall) {
+  console.error("ASSERT FAIL: no compaction call was made")
+  process.exitCode = 1
+}
 
 // request shape checks
 const first = bodies[0]

@@ -21,6 +21,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ModelPicker } from "./ModelPicker"
 import { SkillsSheet } from "./SkillsSheet"
+import {
+  parseSlashCommand,
+  SLASH_COMMANDS,
+  type SlashCommand,
+} from "@/lib/commands"
 import type { Attachment, Effort, ModelRef } from "@/lib/types"
 import {
   cn,
@@ -45,6 +50,8 @@ export interface ComposerProps {
   onEffortChange: (e: Effort) => void
   onSend: (text: string, attachments: Attachment[]) => void
   onStop: () => void
+  /** handles non-local slash commands (compact, clear, title, export, help) */
+  onCommand?: (name: string, arg?: string) => void
   imageMode?: boolean
   /* new-chat extras */
   isNewChat?: boolean
@@ -64,11 +71,13 @@ export function Composer(props: ComposerProps) {
 
   const modelInfo = findModel(props.modelRef)
   const supportsEffort = modelInfo?.reasoning ?? false
+  const isCommand = !props.imageMode && !!parseSlashCommand(text.trim())
   const canSend =
     !props.disabled &&
     !props.generating &&
-    !!props.modelRef &&
-    (text.trim().length > 0 || attachments.length > 0)
+    (isCommand ||
+      (!!props.modelRef &&
+        (text.trim().length > 0 || attachments.length > 0)))
 
   useEffect(() => {
     const ta = taRef.current
@@ -77,13 +86,53 @@ export function Composer(props: ComposerProps) {
     ta.style.height = Math.min(ta.scrollHeight, 168) + "px"
   }, [text])
 
+  const runCommand = (cmd: SlashCommand, arg?: string): void => {
+    if (cmd.name === "model") {
+      setPickerOpen(true)
+    } else if (cmd.name === "effort") {
+      const e = (arg ?? "").toLowerCase() as Effort
+      if (EFFORTS.includes(e)) {
+        props.onEffortChange(e)
+        toast.success(`Reasoning effort: ${e}`)
+      } else {
+        toast.error("Usage: /effort auto|low|medium|high")
+        return
+      }
+    } else if (props.onCommand) {
+      props.onCommand(cmd.name, arg)
+    } else {
+      toast.error("Commands aren't available here")
+      return
+    }
+    setText("")
+  }
+
   const send = () => {
+    const trimmed = text.trim()
+    const parsed = !props.imageMode ? parseSlashCommand(trimmed) : null
+    if (parsed) {
+      const cmd = SLASH_COMMANDS.find((c) => c.name === parsed.name)
+      if (!cmd) {
+        toast.error(`Unknown command /${parsed.name} — try /help`)
+        return
+      }
+      runCommand(cmd, parsed.arg)
+      return
+    }
     if (!canSend) return
-    props.onSend(text.trim(), attachments)
+    props.onSend(trimmed, attachments)
     setText("")
     setAttachments([])
     taRef.current?.focus()
   }
+
+  const slashPrefix = !props.imageMode
+    ? /^\/([a-z]*)$/i.exec(text)?.[1]?.toLowerCase()
+    : undefined
+  const slashMatches =
+    slashPrefix !== undefined
+      ? SLASH_COMMANDS.filter((c) => c.name.startsWith(slashPrefix))
+      : []
 
   const addFiles = async (files: FileList | null) => {
     if (!files) return
@@ -121,6 +170,36 @@ export function Composer(props: ComposerProps) {
   return (
     <div className="px-3 pt-1 pb-safe-plus">
       <div className="rounded-[26px] border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)] dark:shadow-none">
+        {slashMatches.length > 0 && (
+          <div className="border-b border-border/70 px-2 py-1.5">
+            {slashMatches.map((c) => (
+              <button
+                key={c.name}
+                onClick={() => {
+                  if (c.args) {
+                    setText(`/${c.name} `)
+                    taRef.current?.focus()
+                  } else {
+                    runCommand(c)
+                  }
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-accent"
+              >
+                <span className="font-mono text-[13px] font-medium text-primary">
+                  /{c.name}
+                </span>
+                {c.args && (
+                  <span className="font-mono text-[11.5px] text-muted-foreground">
+                    {c.args}
+                  </span>
+                )}
+                <span className="ml-auto truncate text-[12px] text-muted-foreground">
+                  {c.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-3 pt-3 scrollbar-none">
             {attachments.map((a) => (

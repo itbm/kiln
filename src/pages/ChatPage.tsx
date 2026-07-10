@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   CloudUploadIcon,
@@ -6,6 +6,8 @@ import {
   GhostIcon,
   MoreVerticalIcon,
   PencilIcon,
+  ScissorsIcon,
+  SparklesIcon,
   Trash2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -24,12 +26,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useChat, useChatMessages } from "@/hooks/use-chat-data"
 import type { ArtifactBlock } from "@/lib/artifacts"
+import { commandHelpText } from "@/lib/commands"
+import { clearContext, compactChat, estimateWireTokens } from "@/lib/compact"
 import { db, deleteChat } from "@/lib/db"
-import { regenerateLast, sendUserMessage } from "@/lib/engine"
+import {
+  editUserMessage,
+  persistMessage,
+  regenerateChatTitle,
+  regenerateLast,
+  sendUserMessage,
+} from "@/lib/engine"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
-import type { Attachment, Chat, Effort, ModelRef } from "@/lib/types"
+import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
+import { switchToVersion } from "@/lib/versions"
 import { confirmDialog, promptDialog } from "@/stores/dialogs"
+import { findModel } from "@/stores/models"
 import { useSettings } from "@/stores/settings"
 import { useStream } from "@/stores/stream"
 import { useTemp } from "@/stores/temp"
@@ -144,6 +156,82 @@ export default function ChatPage() {
     void regenerateLast(chat, messages, modelRef, effort)
   }
 
+  const handleSwitchVersion = async (msg: Message, target: number) => {
+    if (generating) return
+    await persistMessage(switchToVersion(msg, target), !!chat?.temporary)
+  }
+
+  const handleEditUser = async (msg: Message, newText: string) => {
+    if (!chat || !modelRef || generating) return
+    const idx = messages.findIndex((m) => m.id === msg.id)
+    const after = messages.slice(idx + 1)
+    if (after.length) {
+      const ok = await confirmDialog({
+        title: "Edit and resend?",
+        description: `The ${after.length} message${after.length === 1 ? "" : "s"} after this one will be replaced by a new reply.`,
+        confirmLabel: "Edit & resend",
+      })
+      if (!ok) return
+    }
+    nearBottom.current = true
+    void editUserMessage(chat, messages, msg, newText, modelRef, effort)
+  }
+
+  const runCompact = async (instructions?: string) => {
+    if (!chat) return
+    const id = toast.loading("Compacting conversation…")
+    try {
+      const { summarizedCount } = await compactChat(chat, messages, {
+        instructions,
+      })
+      toast.success(
+        `Compacted ${summarizedCount} message${summarizedCount === 1 ? "" : "s"} into a summary`,
+        { id },
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Compaction failed", { id })
+    }
+  }
+
+  const handleCommand = (name: string, arg?: string) => {
+    if (name === "help") {
+      void confirmDialog({
+        title: "Slash commands",
+        description: commandHelpText(),
+        confirmLabel: "OK",
+      })
+      return
+    }
+    if (!chat) {
+      toast.error(`/${name} needs an active chat`)
+      return
+    }
+    switch (name) {
+      case "compact":
+        void runCompact(arg)
+        break
+      case "clear":
+        void clearContext(chat).then(() =>
+          toast.success("Context cleared — messages stay visible, but aren't resent"),
+        )
+        break
+      case "title":
+        if (arg) {
+          void (chat.temporary
+            ? useTemp.getState().patchChat(chat.id, { title: arg, titleIsManual: true })
+            : db.chats.update(chat.id, { title: arg, titleIsManual: true }))
+        } else {
+          void regenerateChatTitle(chat, messages)
+            .then(() => toast.success("Title regenerated"))
+            .catch((e) => toast.error(e.message))
+        }
+        break
+      case "export":
+        void exportChatFile(chat)
+        break
+    }
+  }
+
   const updateSkills = async (ids: string[]) => {
     setPendingSkills(ids)
     if (chat) {
@@ -182,6 +270,22 @@ export default function ChatPage() {
   const lastMsg = messages[messages.length - 1]
   const showContinue =
     !generating && lastMsg?.role === "assistant" && lastMsg.status === "interrupted"
+
+  // context usage estimate for the meter pill
+  const ctxUsage = useMemo(() => {
+    if (!chat || chat.kind !== "chat" || messages.length < 2) return null
+    const ctx = findModel(modelRef)?.ctx ?? 131_072
+    return Math.min(1, estimateWireTokens(chat, messages) / ctx)
+  }, [chat, messages, modelRef])
+
+  // index of the last message covered by the compaction summary
+  const cutoff = chat?.summaryCutoff ?? 0
+  let lastCoveredIdx = -1
+  if (cutoff) {
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].createdAt <= cutoff) lastCoveredIdx = i
+    }
+  }
 
   return (
     <AppShell>
@@ -257,13 +361,29 @@ export default function ChatPage() {
             >
               <div className="mx-auto max-w-3xl space-y-5 py-4">
                 {messages.map((m, i) => (
-                  <MessageView
-                    key={m.id}
-                    msg={m}
-                    isLast={i === messages.length - 1 && m.role === "assistant"}
-                    onRetry={retry}
-                    onOpenArtifact={setArtifact}
-                  />
+                  <Fragment key={m.id}>
+                    <MessageView
+                      msg={m}
+                      isLast={i === messages.length - 1 && m.role === "assistant"}
+                      busy={generating}
+                      onRetry={retry}
+                      onOpenArtifact={setArtifact}
+                      onEditUser={(msg, text) => void handleEditUser(msg, text)}
+                      onSwitchVersion={(msg, target) =>
+                        void handleSwitchVersion(msg, target)
+                      }
+                    />
+                    {i === lastCoveredIdx && (
+                      <div className="flex items-center gap-2 px-4 text-[11px] text-muted-foreground">
+                        <div className="h-px flex-1 bg-border" />
+                        <SparklesIcon className="size-3 shrink-0" />
+                        <span>
+                          Compacted — messages above are summarised for the model
+                        </span>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
+                    )}
+                  </Fragment>
                 ))}
                 {showContinue && (
                   <div className="px-4">
@@ -284,6 +404,17 @@ export default function ChatPage() {
           )}
 
           <div className="mx-auto w-full max-w-3xl">
+            {ctxUsage !== null && ctxUsage >= 0.6 && !generating && (
+              <div className="flex justify-end px-4 pb-1">
+                <button
+                  onClick={() => void runCompact()}
+                  className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/8 px-2.5 py-1 text-[11.5px] font-medium text-primary active:scale-95"
+                >
+                  <ScissorsIcon className="size-3" />
+                  {Math.round(ctxUsage * 100)}% of context — compact
+                </button>
+              </div>
+            )}
             <Composer
               generating={generating}
               modelRef={modelRef}
@@ -292,6 +423,7 @@ export default function ChatPage() {
               onEffortChange={setEffort}
               onSend={(t, a) => void send(t, a)}
               onStop={() => chatId && useStream.getState().stop(chatId)}
+              onCommand={handleCommand}
               isNewChat={!chat}
               temporary={pendingTemp}
               onToggleTemporary={() => setPendingTemp((v) => !v)}

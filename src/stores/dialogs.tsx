@@ -97,7 +97,9 @@ export function DialogHost() {
         <DialogHeader>
           <DialogTitle>{current.title}</DialogTitle>
           {current.description && (
-            <DialogDescription>{current.description}</DialogDescription>
+            <DialogDescription className="whitespace-pre-line text-left">
+              {current.description}
+            </DialogDescription>
           )}
         </DialogHeader>
         {isPrompt && (

@@ -14,6 +14,9 @@ import { completeText, streamChat } from "./providers"
 import { getEnabledTools, executeTool } from "./tools"
 import { contentWithoutArtifacts } from "./artifacts"
 import { notifyChatDone, acquireWakeLock, releaseWakeLock } from "./notify"
+import { estimateWireTokens, compactChat } from "./compact"
+import { beginNewVersion } from "./versions"
+import { toast } from "sonner"
 import { useStream } from "@/stores/stream"
 import { useTemp } from "@/stores/temp"
 import { useSettings, getSettings } from "@/stores/settings"
@@ -21,8 +24,10 @@ import { findModel } from "@/stores/models"
 
 const MAX_TOOL_ROUNDS = 8
 const PERSIST_INTERVAL = 700
+/** auto-compact when the estimated prompt exceeds this share of the context */
+const COMPACT_THRESHOLD = 0.7
 
-async function persistMessage(msg: Message, temporary: boolean) {
+export async function persistMessage(msg: Message, temporary: boolean) {
   if (temporary) useTemp.getState().putMessage({ ...msg })
   else await db.messages.put({ ...msg })
 }
@@ -50,15 +55,44 @@ export function buildWireHistory(
   chat: Chat | null,
   history: Message[],
 ): WireMessage[] {
-  const wire: WireMessage[] = [
-    { role: "system", content: buildSystemPrompt(chat) },
-  ]
+  let system = buildSystemPrompt(chat)
+  if (chat?.summary) {
+    system +=
+      "\n\n## Earlier conversation (compacted)\nThe earlier part of this conversation was summarised to save space:\n" +
+      chat.summary
+  }
+  const cutoff = chat?.summaryCutoff ?? 0
+  const wire: WireMessage[] = [{ role: "system", content: system }]
   for (const m of history) {
+    if (m.createdAt <= cutoff) continue
     if (m.role === "user") wire.push(attachmentsToWire(m))
     else if (m.content || m.images?.length)
       wire.push({ role: "assistant", content: m.content })
   }
   return wire
+}
+
+/** Compact automatically when the next request would crowd the context. */
+async function maybeAutoCompact(
+  chat: Chat,
+  history: Message[],
+  modelRef: ModelRef,
+): Promise<Chat> {
+  if (chat.kind !== "chat" || !getSettings().autoCompact) return chat
+  const ctx = findModel(modelRef)?.ctx ?? 131_072
+  if (estimateWireTokens(chat, history) < ctx * COMPACT_THRESHOLD) return chat
+  try {
+    // aggressive when hitting the limit: keep only the last exchange verbatim
+    const { chat: updated, summarizedCount } = await compactChat(chat, history, {
+      keepRecent: 2,
+    })
+    toast.info(
+      `Auto-compacted ${summarizedCount} older message${summarizedCount === 1 ? "" : "s"} to fit the model's context`,
+    )
+    return updated
+  } catch {
+    return chat // best-effort: send anyway
+  }
 }
 
 export interface SendOptions {
@@ -96,10 +130,14 @@ export async function sendUserMessage(opts: SendOptions): Promise<void> {
       : { lastModel: modelRef, lastEffort: effort },
   )
   const history = [...opts.history, userMsg]
-  await runAssistantTurn(chat, history, modelRef, effort)
+  const compacted = await maybeAutoCompact(chat, history, modelRef)
+  await runAssistantTurn(compacted, history, modelRef, effort)
 }
 
-/** Re-run generation for the tail of the conversation (regenerate). */
+/**
+ * Regenerate the last assistant message in place: the current generation is
+ * archived as a version and a fresh one streams into the same message.
+ */
 export async function regenerateLast(
   chat: Chat,
   history: Message[],
@@ -107,20 +145,10 @@ export async function regenerateLast(
   effort: Effort,
 ): Promise<void> {
   const last = history[history.length - 1]
+  let reuse: Message | undefined
   if (last?.role === "assistant") {
+    reuse = last
     history = history.slice(0, -1)
-    if (chat.temporary) {
-      useTemp.setState((s) => ({
-        messages: {
-          ...s.messages,
-          [chat.id]: (s.messages[chat.id] ?? []).filter(
-            (m) => m.id !== last.id,
-          ),
-        },
-      }))
-    } else {
-      await db.messages.delete(last.id)
-    }
   }
   await patchChat(chat, {
     provider: modelRef.provider,
@@ -128,7 +156,47 @@ export async function regenerateLast(
     effort,
   })
   useSettings.getState().set({ lastModel: modelRef, lastEffort: effort })
-  await runAssistantTurn(chat, history, modelRef, effort)
+  await runAssistantTurn(chat, history, modelRef, effort, reuse)
+}
+
+/**
+ * Rewrite a user message and regenerate from that point. Any messages after
+ * it are removed (the caller confirms with the user first).
+ */
+export async function editUserMessage(
+  chat: Chat,
+  history: Message[],
+  target: Message,
+  newText: string,
+  modelRef: ModelRef,
+  effort: Effort,
+): Promise<void> {
+  const temporary = !!chat.temporary
+  const idx = history.findIndex((m) => m.id === target.id)
+  if (idx < 0) return
+  // if the edited message was already compacted away, the summary is stale
+  if (target.createdAt <= (chat.summaryCutoff ?? 0)) {
+    await patchChat(chat, { summary: undefined, summaryCutoff: 0 })
+    chat = { ...chat, summary: undefined, summaryCutoff: 0 }
+  }
+  const updated: Message = { ...target, content: newText, editedAt: Date.now() }
+  await persistMessage(updated, temporary)
+  const after = history.slice(idx + 1)
+  if (after.length) {
+    const ids = after.map((m) => m.id)
+    if (temporary) useTemp.getState().deleteMessages(chat.id, ids)
+    else await db.messages.bulkDelete(ids)
+  }
+  await patchChat(chat, {
+    provider: modelRef.provider,
+    model: modelRef.model,
+    effort,
+    updatedAt: Date.now(),
+  })
+  useSettings.getState().set({ lastModel: modelRef, lastEffort: effort })
+  const newHistory = [...history.slice(0, idx), updated]
+  const compacted = await maybeAutoCompact(chat, newHistory, modelRef)
+  await runAssistantTurn(compacted, newHistory, modelRef, effort)
 }
 
 async function runAssistantTurn(
@@ -136,24 +204,34 @@ async function runAssistantTurn(
   history: Message[],
   modelRef: ModelRef,
   effort: Effort,
+  reuseMsg?: Message,
 ): Promise<void> {
   const temporary = !!chat.temporary
   const stream = useStream.getState()
   const isImage = chat.kind === "image"
   const modelInfo = findModel(modelRef)
 
-  const msg: Message = {
-    id: uid(),
-    chatId: chat.id,
-    role: "assistant",
-    content: "",
-    provider: modelRef.provider,
-    model: modelRef.model,
-    modelName: modelInfo?.name,
-    effort,
-    status: "streaming",
-    createdAt: Date.now(),
-  }
+  const msg: Message = reuseMsg
+    ? {
+        ...beginNewVersion(reuseMsg),
+        provider: modelRef.provider,
+        model: modelRef.model,
+        modelName: modelInfo?.name,
+        effort,
+        status: "streaming",
+      }
+    : {
+        id: uid(),
+        chatId: chat.id,
+        role: "assistant",
+        content: "",
+        provider: modelRef.provider,
+        model: modelRef.model,
+        modelName: modelInfo?.name,
+        effort,
+        status: "streaming",
+        createdAt: Date.now(),
+      }
   await persistMessage(msg, temporary)
   const controller = stream.begin(chat.id, msg.id)
   void acquireWakeLock()
@@ -320,6 +398,18 @@ async function runAssistantTurn(
   ) {
     void generateTitle(chat, history, finalMsg)
   }
+}
+
+/** Used by the /title command with no argument. */
+export async function regenerateChatTitle(
+  chat: Chat,
+  history: Message[],
+): Promise<void> {
+  const assistant = [...history]
+    .reverse()
+    .find((m) => m.role === "assistant" && m.content && m.status === "done")
+  if (!assistant) throw new Error("No finished reply to name the chat from yet")
+  await generateTitle({ ...chat, titleIsManual: false }, history, assistant)
 }
 
 async function generateTitle(

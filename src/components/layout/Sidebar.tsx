@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   CloudUploadIcon,
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAllChats } from "@/hooks/use-chat-data"
 import { useIsDark } from "@/hooks/use-theme"
-import { deleteChat, db } from "@/lib/db"
+import { deleteChat, db, searchMessages } from "@/lib/db"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Chat } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -47,10 +47,12 @@ function groupLabel(ts: number): string {
 function ChatRow({
   chat,
   active,
+  snippet,
   onNavigate,
 }: {
   chat: Chat
   active: boolean
+  snippet?: string
   onNavigate: (path: string) => void
 }) {
   const syncUrl = useSettings((s) => s.syncUrl)
@@ -99,13 +101,20 @@ function ChatRow({
     >
       <button
         onClick={() => onNavigate(path)}
-        className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left"
+        className="min-w-0 flex-1 px-2.5 py-2 text-left"
       >
-        {chat.temporary && <GhostIcon className="size-3.5 shrink-0 text-primary" />}
-        {chat.kind === "image" && (
-          <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="flex items-center gap-2">
+          {chat.temporary && <GhostIcon className="size-3.5 shrink-0 text-primary" />}
+          {chat.kind === "image" && (
+            <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span className="truncate text-[13.5px]">{chat.title}</span>
+        </span>
+        {snippet && (
+          <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
+            {snippet}
+          </span>
         )}
-        <span className="truncate text-[13.5px]">{chat.title}</span>
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -167,9 +176,24 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     onNavigate?.()
   }
 
+  // full-text search over message content (debounced)
+  const [contentHits, setContentHits] = useState<Map<string, string> | null>(null)
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) {
+      setContentHits(null)
+      return
+    }
+    const t = setTimeout(() => {
+      void searchMessages(q).then(setContentHits)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [query])
+
   const groups = useMemo(() => {
-    const filtered = (chats ?? []).filter((c) =>
-      c.title.toLowerCase().includes(query.toLowerCase()),
+    const q = query.trim().toLowerCase()
+    const filtered = (chats ?? []).filter(
+      (c) => c.title.toLowerCase().includes(q) || contentHits?.has(c.id),
     )
     const out: { label: string; chats: Chat[] }[] = []
     for (const c of filtered) {
@@ -179,7 +203,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       else out.push({ label, chats: [c] })
     }
     return out
-  }, [chats, query])
+  }, [chats, query, contentHits])
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -235,6 +259,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   key={c.id}
                   chat={c}
                   active={location.pathname.includes(c.id)}
+                  snippet={contentHits?.get(c.id)}
                   onNavigate={go}
                 />
               ))}
