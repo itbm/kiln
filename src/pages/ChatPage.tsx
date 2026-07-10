@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   CloudUploadIcon,
@@ -59,8 +59,10 @@ export default function ChatPage() {
 
   const lastModel = useSettings((s) => s.lastModel)
   const lastEffort = useSettings((s) => s.lastEffort)
-  const defaultSkillIds = useSettings((s) =>
-    s.skills.filter((sk) => sk.enabled).map((sk) => sk.id),
+  const skills = useSettings((s) => s.skills)
+  const defaultSkillIds = useMemo(
+    () => skills.filter((sk) => sk.enabled).map((sk) => sk.id),
+    [skills],
   )
 
   const [modelRef, setModelRef] = useState<ModelRef | null>(lastModel)

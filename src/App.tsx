@@ -14,8 +14,16 @@ export default function App() {
   const isDark = useIsDark()
 
   useEffect(() => {
-    void recoverInterrupted()
-    void useModels.getState().refresh()
+    const boot = async () => {
+      if (new URLSearchParams(window.location.search).has("seed")) {
+        const { seedDemo } = await import("@/lib/demo")
+        await seedDemo()
+        window.history.replaceState(null, "", "/")
+      }
+      void recoverInterrupted()
+      void useModels.getState().refresh()
+    }
+    void boot()
     clearBadge()
     const onVisible = () => {
       if (document.visibilityState === "visible") clearBadge()
