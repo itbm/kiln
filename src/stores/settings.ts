@@ -16,7 +16,7 @@ interface SettingsState {
   theme: ThemePref
   openrouterKey: string
   ollamaKey: string
-  /** "https://ollama.com" (direct) or "/api/ollama" (same-origin proxy) */
+  /** "/api/ollama" (same-origin proxy, default) or a direct URL (e.g. LAN Ollama) */
   ollamaBaseUrl: string
   tavilyKey: string
   /** null = built-in default */
@@ -48,7 +48,7 @@ export const useSettings = create<SettingsState>()(
       theme: "system",
       openrouterKey: "",
       ollamaKey: "",
-      ollamaBaseUrl: "https://ollama.com",
+      ollamaBaseUrl: "/api/ollama",
       tavilyKey: "",
       systemPrompt: null,
       personalization: { enabled: true, name: "", role: "", notes: "" },

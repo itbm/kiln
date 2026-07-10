@@ -278,19 +278,21 @@ export default function SettingsPage() {
             <Input
               value={s.ollamaBaseUrl}
               onChange={(e) => s.set({ ollamaBaseUrl: e.target.value.trim() })}
-              placeholder="https://ollama.com"
+              placeholder="/api/ollama"
               className="font-mono text-[13px]"
             />
             <p className="text-[12px] leading-snug text-muted-foreground">
-              ollama.com blocks direct browser calls (CORS). When you host Amber with the
-              bundled Docker image, use the built-in proxy instead:{" "}
+              The default{" "}
               <button
-                className="text-primary underline underline-offset-2"
+                className="font-mono text-primary underline underline-offset-2"
                 onClick={() => s.set({ ollamaBaseUrl: "/api/ollama" })}
               >
-                use /api/ollama
-              </button>
-              . A local Ollama (e.g. http://192.168.1.10:11434 with OLLAMA_ORIGINS set) also works.
+                /api/ollama
+              </button>{" "}
+              relays to ollama.com through the server hosting this app (ollama.com
+              itself blocks direct browser calls). A local/LAN Ollama also works, e.g.{" "}
+              <span className="font-mono">http://192.168.1.10:11434</span> with{" "}
+              <span className="font-mono">OLLAMA_ORIGINS</span> set.
             </p>
           </div>
           <KeyInput

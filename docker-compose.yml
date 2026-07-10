@@ -1,0 +1,7 @@
+services:
+  amber:
+    build: .
+    container_name: amber
+    ports:
+      - "8080:80"
+    restart: unless-stopped
