@@ -29,6 +29,7 @@ import { regenerateLast, sendUserMessage } from "@/lib/engine"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Attachment, Chat, Effort, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
+import { confirmDialog, promptDialog } from "@/stores/dialogs"
 import { useSettings } from "@/stores/settings"
 import { useStream } from "@/stores/stream"
 import { useTemp } from "@/stores/temp"
@@ -153,16 +154,26 @@ export default function ChatPage() {
 
   const renameChat = async () => {
     if (!chat) return
-    const title = window.prompt("Rename chat", chat.title)
-    if (!title?.trim()) return
+    const title = await promptDialog({
+      title: "Rename chat",
+      initial: chat.title,
+      confirmLabel: "Rename",
+    })
+    if (!title) return
     if (chat.temporary)
-      useTemp.getState().patchChat(chat.id, { title: title.trim(), titleIsManual: true })
-    else await db.chats.update(chat.id, { title: title.trim(), titleIsManual: true })
+      useTemp.getState().patchChat(chat.id, { title, titleIsManual: true })
+    else await db.chats.update(chat.id, { title, titleIsManual: true })
   }
 
   const removeChat = async () => {
     if (!chat) return
-    if (!window.confirm(`Delete “${chat.title}”? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: `Delete “${chat.title}”?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!ok) return
     if (chat.temporary) useTemp.getState().remove(chat.id)
     else await deleteChat(chat.id)
     navigate("/")

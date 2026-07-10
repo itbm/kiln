@@ -29,6 +29,7 @@ import { deleteChat, db } from "@/lib/db"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Chat } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { confirmDialog, promptDialog } from "@/stores/dialogs"
 import { useSettings } from "@/stores/settings"
 import { useTemp } from "@/stores/temp"
 
@@ -56,15 +57,25 @@ function ChatRow({
   const path = chat.kind === "image" ? `/images/${chat.id}` : `/chat/${chat.id}`
 
   const rename = async () => {
-    const title = window.prompt("Rename chat", chat.title)
-    if (!title?.trim()) return
+    const title = await promptDialog({
+      title: "Rename chat",
+      initial: chat.title,
+      confirmLabel: "Rename",
+    })
+    if (!title) return
     if (chat.temporary)
-      useTemp.getState().patchChat(chat.id, { title: title.trim(), titleIsManual: true })
-    else await db.chats.update(chat.id, { title: title.trim(), titleIsManual: true })
+      useTemp.getState().patchChat(chat.id, { title, titleIsManual: true })
+    else await db.chats.update(chat.id, { title, titleIsManual: true })
   }
 
   const remove = async () => {
-    if (!window.confirm(`Delete “${chat.title}”? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: `Delete “${chat.title}”?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!ok) return
     if (chat.temporary) useTemp.getState().remove(chat.id)
     else await deleteChat(chat.id)
     if (active) onNavigate(chat.kind === "image" ? "/images" : "/")
@@ -203,7 +214,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70"
+            className="w-full bg-transparent text-[16px] outline-none placeholder:text-muted-foreground/70 md:text-[13px]"
           />
         </div>
       </div>

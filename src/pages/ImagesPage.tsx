@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useChat, useChatMessages } from "@/hooks/use-chat-data"
 import { db, deleteChat } from "@/lib/db"
+import { confirmDialog } from "@/stores/dialogs"
 import { sendUserMessage } from "@/lib/engine"
 import type { Attachment, Chat, ModelRef } from "@/lib/types"
 import { cn, uid } from "@/lib/utils"
@@ -90,9 +91,14 @@ export default function ImagesPage() {
                     <DropdownMenuItem
                       variant="destructive"
                       onClick={() => {
-                        if (window.confirm("Delete this image session?")) {
-                          void deleteChat(chat.id).then(() => navigate("/images"))
-                        }
+                        void confirmDialog({
+                          title: "Delete this image session?",
+                          description: "This cannot be undone.",
+                          confirmLabel: "Delete",
+                          destructive: true,
+                        }).then((ok) => {
+                          if (ok) void deleteChat(chat.id).then(() => navigate("/images"))
+                        })
                       }}
                     >
                       <Trash2Icon /> Delete session

@@ -163,7 +163,7 @@ export function Composer(props: ComposerProps) {
           }}
           placeholder={props.placeholder ?? "Message Amber…"}
           rows={1}
-          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/70"
+          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[16px] leading-relaxed outline-none placeholder:text-muted-foreground/70 md:text-[15px]"
         />
 
         <div className="flex items-center gap-1 px-2 pb-2">

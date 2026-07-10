@@ -110,8 +110,6 @@ export async function regenerateLast(
   if (last?.role === "assistant") {
     history = history.slice(0, -1)
     if (chat.temporary) {
-      const st = useTemp.getState()
-      st.putChat({ ...st.chats[chat.id] })
       useTemp.setState((s) => ({
         messages: {
           ...s.messages,
@@ -183,7 +181,11 @@ async function runAssistantTurn(
     images: images.length ? [...images] : undefined,
   })
 
-  const pushLive = () =>
+  // Throttle store updates (~12fps) so long streams don't re-render per token
+  let lastPush = 0
+  let pushTimer: ReturnType<typeof setTimeout> | undefined
+  const doPush = () => {
+    lastPush = Date.now()
     useStream.getState().update(msg.id, {
       content,
       reasoning,
@@ -191,6 +193,16 @@ async function runAssistantTurn(
       images: [...images],
       reasoningMs,
     })
+  }
+  const pushLive = (force = false) => {
+    if (force || Date.now() - lastPush > 80) {
+      clearTimeout(pushTimer)
+      pushTimer = undefined
+      doPush()
+    } else if (!pushTimer) {
+      pushTimer = setTimeout(doPush, 90)
+    }
+  }
 
   const maybePersist = async (force = false) => {
     if (!force && Date.now() - lastPersist < PERSIST_INTERVAL) return
@@ -245,7 +257,7 @@ async function runAssistantTurn(
           status: "running",
         }
         steps.push(step)
-        pushLive()
+        pushLive(true)
         try {
           const result = await executeTool(call.name, args, controller.signal)
           step.result = result
@@ -266,23 +278,20 @@ async function runAssistantTurn(
             toolName: call.name,
           })
         }
-        pushLive()
+        pushLive(true)
         await maybePersist(true)
       }
     }
   } catch (e) {
     if (controller.signal.aborted) {
-      finalStatus = content || reasoning || images.length ? "stopped" : "done"
-      if (finalStatus === "done" && !content) {
-        finalStatus = "stopped"
-        content = ""
-      }
+      finalStatus = "stopped"
     } else {
       finalStatus = "error"
       errorText = e instanceof Error ? e.message : String(e)
     }
   }
 
+  clearTimeout(pushTimer)
   if (reasoningStart && reasoningMs === undefined)
     reasoningMs = Date.now() - reasoningStart
 

@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { Route, Routes } from "react-router-dom"
 import { Toaster } from "@/components/ui/sonner"
+import { DialogHost } from "@/stores/dialogs"
 import { useApplyTheme, useIsDark } from "@/hooks/use-theme"
 import { recoverInterrupted } from "@/lib/db"
 import { clearBadge } from "@/lib/notify"
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="*" element={<ChatPage />} />
       </Routes>
       <Toaster position="top-center" theme={isDark ? "dark" : "light"} />
+      <DialogHost />
     </>
   )
 }

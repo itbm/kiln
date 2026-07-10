@@ -14,7 +14,7 @@ export function ReasoningBlock({
   const [open, setOpen] = useState(false)
   const label = active
     ? "Thinking…"
-    : reasoningMs
+    : reasoningMs !== undefined
       ? `Thought for ${reasoningMs < 60_000 ? `${Math.max(1, Math.round(reasoningMs / 1000))}s` : `${Math.round(reasoningMs / 60_000)}m`}`
       : "Thought process"
 

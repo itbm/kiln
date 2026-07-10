@@ -42,6 +42,7 @@ import { checkOllamaKey } from "@/lib/providers/ollama"
 import { ensureNotificationPermission } from "@/lib/notify"
 import { exportAllData, importData } from "@/lib/sync"
 import type { Skill } from "@/lib/types"
+import { confirmDialog } from "@/stores/dialogs"
 import { displayModelName } from "@/stores/models"
 import { useSettings, type ThemePref } from "@/stores/settings"
 
@@ -100,7 +101,7 @@ function KeyInput({
             value={value}
             onChange={(e) => onChange(e.target.value.trim())}
             placeholder={placeholder}
-            className="pr-9 font-mono text-[13px]"
+            className="pr-9 font-mono text-[16px] md:text-[13px]"
           />
           <button
             type="button"
@@ -279,7 +280,7 @@ export default function SettingsPage() {
               value={s.ollamaBaseUrl}
               onChange={(e) => s.set({ ollamaBaseUrl: e.target.value.trim() })}
               placeholder="/api/ollama"
-              className="font-mono text-[13px]"
+              className="font-mono text-[16px] md:text-[13px]"
             />
             <p className="text-[12px] leading-snug text-muted-foreground">
               The default{" "}
@@ -365,7 +366,7 @@ export default function SettingsPage() {
           <Textarea
             value={s.systemPrompt ?? DEFAULT_SYSTEM_PROMPT}
             onChange={(e) => s.set({ systemPrompt: e.target.value })}
-            className="min-h-44 font-mono text-[12px] leading-relaxed"
+            className="min-h-44 font-mono text-[16px] leading-relaxed md:text-[12px]"
           />
           <div className="flex justify-end">
             <Button
@@ -461,7 +462,11 @@ export default function SettingsPage() {
                 size="icon-xs"
                 aria-label="Delete skill"
                 onClick={() => {
-                  if (window.confirm(`Delete skill “${sk.name}”?`)) s.removeSkill(sk.id)
+                  void confirmDialog({
+                    title: `Delete skill “${sk.name}”?`,
+                    confirmLabel: "Delete",
+                    destructive: true,
+                  }).then((ok) => ok && s.removeSkill(sk.id))
                 }}
               >
                 <Trash2Icon />
@@ -538,7 +543,7 @@ export default function SettingsPage() {
               value={s.syncUrl}
               onChange={(e) => s.set({ syncUrl: e.target.value.trim() })}
               placeholder="https://amber.example.com/api"
-              className="font-mono text-[13px]"
+              className="font-mono text-[16px] md:text-[13px]"
             />
           </div>
           <div className="space-y-1.5">
@@ -547,7 +552,7 @@ export default function SettingsPage() {
               value={s.syncToken}
               onChange={(e) => s.set({ syncToken: e.target.value.trim() })}
               placeholder="optional bearer token"
-              className="font-mono text-[13px]"
+              className="font-mono text-[16px] md:text-[13px]"
             />
           </div>
           <p className="text-[12px] text-muted-foreground">
@@ -569,16 +574,21 @@ export default function SettingsPage() {
               size="sm"
               className="text-destructive"
               onClick={() => {
-                if (
-                  window.confirm(
-                    "Delete ALL chats and messages on this device? Settings are kept. This cannot be undone.",
-                  )
-                ) {
-                  void db.transaction("rw", db.chats, db.messages, async () => {
-                    await db.messages.clear()
-                    await db.chats.clear()
-                  }).then(() => toast.success("All chats deleted"))
-                }
+                void confirmDialog({
+                  title: "Delete ALL chats?",
+                  description:
+                    "Every chat and message on this device will be removed. Settings are kept. This cannot be undone.",
+                  confirmLabel: "Delete everything",
+                  destructive: true,
+                }).then((ok) => {
+                  if (!ok) return
+                  void db
+                    .transaction("rw", db.chats, db.messages, async () => {
+                      await db.messages.clear()
+                      await db.chats.clear()
+                    })
+                    .then(() => toast.success("All chats deleted"))
+                })
               }}
             >
               Delete all chats
