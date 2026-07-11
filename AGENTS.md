@@ -50,6 +50,16 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   from `src/stores/dialogs.tsx`, never `window.confirm/prompt`.
 - Edge-flush bottom surfaces use `pb-safe-plus`.
 
+## Parked features
+
+- **Ollama usage ring** (approved design: `docs/mockups/usage-ring.png`) —
+  blocked upstream: Ollama exposes no subscription-usage API yet
+  (ollama/ollama#15132, #15663, #16448; `/api/me` returns account info
+  only, no rate-limit headers on responses — verified July 2026). When the
+  endpoint ships, implement the mockup: ring beside send (most-constrained
+  window), tap/hover detail bars, Settings card. Until then a 429 from
+  Ollama surfaces as a friendly limit-reached message (providers/ollama.ts).
+
 ## Architecture pointers
 
 - `src/lib/engine.ts` — the assistant turn loop: streaming, tools,

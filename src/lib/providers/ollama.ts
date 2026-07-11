@@ -156,6 +156,18 @@ export async function* streamOllama(
     } catch {
       /* keep status */
     }
+    if (res.status === 429) {
+      // Subscription caps (5-hour / weekly). No usage API exists yet
+      // (ollama/ollama#15132) — the best we can do is explain clearly.
+      const retryAfter = res.headers.get("retry-after")
+      const wait =
+        retryAfter && /^\d+$/.test(retryAfter)
+          ? ` Try again in ~${Math.max(1, Math.ceil(parseInt(retryAfter) / 60))} min.`
+          : ""
+      throw new Error(
+        `Ollama usage limit reached — your subscription's 5-hour or weekly cap is used up. It resets automatically; see ollama.com/settings/usage.${wait}`,
+      )
+    }
     // Model may not support think levels — retry once without.
     if (/think/i.test(msg) && req.effort !== "auto") {
       res = await fetch(`${base()}/api/chat`, {
