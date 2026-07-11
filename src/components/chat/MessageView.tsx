@@ -20,6 +20,8 @@ import { MarkdownView } from "./MarkdownView"
 import { ReasoningBlock } from "./ReasoningBlock"
 import { ToolStepView } from "./ToolStepView"
 import { ArtifactCard } from "./ArtifactView"
+import { QuestionsCard } from "./QuestionsSheet"
+import type { QuestionsBlock } from "@/lib/questions"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -155,6 +157,7 @@ export const MessageView = memo(function MessageView({
   onOpenArtifact,
   onEditUser,
   onSwitchVersion,
+  onOpenQuestions,
 }: {
   msg: Message
   isLast: boolean
@@ -163,6 +166,7 @@ export const MessageView = memo(function MessageView({
   onOpenArtifact: (a: ArtifactBlock) => void
   onEditUser?: (msg: Message, text: string) => void
   onSwitchVersion?: (msg: Message, target: number) => void
+  onOpenQuestions?: (msg: Message, block: QuestionsBlock) => void
 }) {
   const live = useStream((s) => s.live[msg.id])
 
@@ -204,11 +208,18 @@ export const MessageView = memo(function MessageView({
       {segments.map((seg, i) =>
         seg.kind === "text" ? (
           <MarkdownView key={i} content={seg.text} />
-        ) : (
+        ) : seg.kind === "artifact" ? (
           <ArtifactCard
             key={`a-${i}`}
             artifact={seg.artifact}
             onOpen={() => onOpenArtifact(seg.artifact)}
+          />
+        ) : (
+          <QuestionsCard
+            key={`q-${i}`}
+            block={seg.block}
+            answered={!!msg.questionsAnswered}
+            onOpen={() => onOpenQuestions?.(msg, seg.block)}
           />
         ),
       )}

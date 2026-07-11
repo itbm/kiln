@@ -327,6 +327,38 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
     ],
   )
 
+  const quiz = mk(
+    {
+      id: "demo-quiz",
+      title: "Start a self-hosted blog",
+      updatedAt: now - 1.2 * H,
+      createdAt: now - 1.3 * H,
+    },
+    [
+      {
+        role: "user",
+        content: "I want to start a self-hosted blog. Help me pick the stack.",
+      },
+      {
+        role: "assistant",
+        modelName: "Claude Sonnet 4.5",
+        content: `Happy to help — two choices shape everything else, so let me ask first:
+
+<questions>
+<question text="Which platform appeals most?">
+<option>Ghost (polished, batteries included)</option>
+<option>WordPress (endless plugins)</option>
+<option>Hugo static site (fast, no server)</option>
+</question>
+<question text="How do you want to write posts?">
+<option>Web editor in the browser</option>
+<option>Markdown files in git</option>
+</question>
+</questions>`,
+      },
+    ],
+  )
+
   const images: { c: Chat; list: Message[] } = {
     c: {
       id: "demo-images",
@@ -365,7 +397,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
   }
 
   await db.transaction("rw", db.chats, db.messages, async () => {
-    for (const { c, list } of [kyoto, coffee, script, images]) {
+    for (const { c, list } of [kyoto, coffee, script, quiz, images]) {
       await db.chats.put(c)
       await db.messages.bulkPut(list)
     }

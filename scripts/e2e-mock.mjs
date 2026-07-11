@@ -57,6 +57,18 @@ const summaryResp = sse([
   chunk({}, "stop"),
 ])
 
+// Interactive questions reply — split across chunks mid-tag to exercise
+// the streaming partial-tag handling
+const questionsResp = sse([
+  chunk({ content: "Two quick questions first:\n\n<quest" }),
+  chunk({
+    content:
+      'ions>\n<question text="Where will you deploy?">\n<option>Docker on a VPS</option>\n<option>Fly.io</option>\n<option>Raspberry Pi</option>\n</question>\n<question text="Which auth style do you prefer?">\n<option>Passwords</option>\n<option>OAuth only</option>\n</quest',
+  }),
+  chunk({ content: "ion>\n</questions>" }),
+  chunk({}, "stop"),
+])
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
 })
@@ -115,14 +127,22 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
   const system = body.messages?.[0]?.content ?? ""
   const isTitle = system.includes("short titles")
   const isSummary = system.includes("compress chat conversations")
+  const lastUser = [...(body.messages ?? [])]
+    .reverse()
+    .find((m) => m.role === "user")
+  const asksQuestions =
+    typeof lastUser?.content === "string" &&
+    lastUser.content.includes("Ask me setup questions")
   const hasToolResult = body.messages?.some((m) => m.role === "tool")
   const payload = isTitle
     ? titleResp
     : isSummary
       ? summaryResp
-      : hasToolResult
-        ? round2
-        : round1
+      : asksQuestions
+        ? questionsResp
+        : hasToolResult
+          ? round2
+          : round1
   await route.fulfill({
     status: 200,
     headers: { "content-type": "text/event-stream" },
@@ -197,12 +217,24 @@ console.log("ok: auto-compaction divider appeared")
 const compactionCall = bodies.find((b) =>
   b.messages?.[0]?.content?.includes("compress chat conversations"),
 )
-const afterCompact = bodies[bodies.length - 1]
-console.log(
-  "ok: summary injected into system prompt:",
-  afterCompact.messages[0].content.includes("fresh roast date matters most"),
-)
 await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 15000 })
+// the chat request AFTER compaction must carry the summary in its system prompt
+for (let i = 0; i < 40; i++) {
+  const injected = bodies.some((b) => {
+    const s = b.messages?.[0]?.content ?? ""
+    return s.includes("fresh roast date matters most") && !s.includes("compress chat conversations")
+  })
+  if (injected) break
+  await page.waitForTimeout(250)
+}
+{
+  const injected = bodies.some((b) => {
+    const s = b.messages?.[0]?.content ?? ""
+    return s.includes("fresh roast date matters most") && !s.includes("compress chat conversations")
+  })
+  console.log("ok: summary injected into system prompt:", injected)
+  if (!injected) process.exitCode = 1
+}
 
 // --- edit a user message and resend ---
 await page.getByLabel("Edit message").first().click()
@@ -215,6 +247,41 @@ await page.getByText("edited").first().waitFor({ timeout: 15000 })
 console.log("ok: user message edited and regenerated")
 await page.waitForTimeout(1500)
 await page.screenshot({ path: "shots/e2e-edited.png" })
+
+// --- interactive questions: auto-open, dismiss/reopen, answer, submit ---
+await page.getByPlaceholder("Message Kiln…").fill("Ask me setup questions")
+await page.getByLabel("Send").click()
+await page.getByText("Question 1 of 2").waitFor({ timeout: 15000 })
+console.log("ok: questions sheet auto-opened after streaming")
+await page.keyboard.press("Escape")
+await page.getByText("2 questions · tap to answer").waitFor({ timeout: 5000 })
+await page.getByText("A few questions for you").click()
+await page.getByText("Question 1 of 2").waitFor({ timeout: 5000 })
+console.log("ok: dismissed to read chat, reopened from card")
+await page.getByText("Docker on a VPS").click()
+await page.getByRole("button", { name: "Next" }).click()
+await page.getByText("Other…").click()
+await page.getByPlaceholder("Type your answer…").fill("magic links")
+await page.getByRole("button", { name: "Review" }).click()
+await page.getByText("magic links").first().waitFor({ timeout: 5000 })
+await page.screenshot({ path: "shots/e2e-questions-review.png" })
+await page.getByRole("button", { name: "Submit" }).click()
+await page
+  .getByText("Where will you deploy? — Docker on a VPS")
+  .waitFor({ timeout: 10000 })
+await page.getByText("Answered ✓").waitFor({ timeout: 10000 })
+console.log("ok: answers sent as a message; card marked answered")
+// the send happens after (possibly) another auto-compaction — poll for it
+for (let i = 0; i < 60; i++) {
+  if (bodies.some((b) => JSON.stringify(b.messages).includes("Which auth style do you prefer? — magic links"))) break
+  await page.waitForTimeout(250)
+}
+if (!bodies.some((b) => JSON.stringify(b.messages).includes("Which auth style do you prefer? — magic links"))) {
+  console.error("ASSERT FAIL: free-text answer never reached the provider")
+  process.exitCode = 1
+} else {
+  console.log("ok: free-text answer reached the provider")
+}
 if (!compactionCall) {
   console.error("ASSERT FAIL: no compaction call was made")
   process.exitCode = 1

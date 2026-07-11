@@ -105,6 +105,8 @@ export interface Message {
   error?: string
   createdAt: number
   editedAt?: number
+  /** the user has submitted answers to this message's <questions> block */
+  questionsAnswered?: boolean
   /** alternative generations (regenerations); active one lives on the message itself */
   versions?: Generation[]
   /** position of the active generation in the full ordering; defaults to versions.length */

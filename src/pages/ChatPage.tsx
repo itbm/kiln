@@ -17,6 +17,7 @@ import { ChatHeader } from "@/components/layout/ChatHeader"
 import { Composer } from "@/components/chat/Composer"
 import { MessageView } from "@/components/chat/MessageView"
 import { ArtifactViewer } from "@/components/chat/ArtifactView"
+import { QuestionsSheet } from "@/components/chat/QuestionsSheet"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -37,6 +38,12 @@ import {
   regenerateLast,
   sendUserMessage,
 } from "@/lib/engine"
+import {
+  findQuestions,
+  formatAnswers,
+  type QAnswer,
+  type QuestionsBlock,
+} from "@/lib/questions"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
@@ -106,6 +113,10 @@ export default function ChatPage() {
   const [pendingTemp, setPendingTemp] = useState(false)
   const [pendingSkills, setPendingSkills] = useState<string[]>(defaultSkillIds)
   const [artifact, setArtifact] = useState<ArtifactBlock | null>(null)
+  const [questionsFor, setQuestionsFor] = useState<{
+    msg: Message
+    block: QuestionsBlock
+  } | null>(null)
 
   const generating = useStream((s) => (chatId ? !!s.generating[chatId] : false))
   // subscribe to live stream length so auto-scroll follows tokens
@@ -144,6 +155,36 @@ export default function ChatPage() {
     const el = scrollRef.current
     if (!el) return
     nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }
+
+  // Auto-open the questions sheet when a reply that ends in a <questions>
+  // block finishes streaming (not when merely browsing an old chat).
+  const prevGenerating = useRef(false)
+  useEffect(() => {
+    const justFinished = prevGenerating.current && !generating
+    prevGenerating.current = generating
+    if (!justFinished || questionsFor) return
+    const last = messages[messages.length - 1]
+    if (
+      !last ||
+      last.role !== "assistant" ||
+      last.status !== "done" ||
+      last.questionsAnswered
+    )
+      return
+    const block = findQuestions(last.content)
+    if (block) setQuestionsFor({ msg: last, block })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generating, messages])
+
+  const submitAnswers = async (answers: QAnswer[]) => {
+    if (!questionsFor || !chat) return
+    await persistMessage(
+      { ...questionsFor.msg, questionsAnswered: true },
+      !!chat.temporary,
+    )
+    setQuestionsFor(null)
+    await send(formatAnswers(answers), [])
   }
 
   const send = async (text: string, attachments: Attachment[]) => {
@@ -399,6 +440,9 @@ export default function ChatPage() {
                       onSwitchVersion={(msg, target) =>
                         void handleSwitchVersion(msg, target)
                       }
+                      onOpenQuestions={(msg, block) =>
+                        setQuestionsFor({ msg, block })
+                      }
                     />
                     {i === lastCoveredIdx && (
                       <div className="flex items-center gap-2 px-4 text-[11px] text-muted-foreground">
@@ -462,6 +506,16 @@ export default function ChatPage() {
           )}
 
           <ArtifactViewer artifact={artifact} onClose={() => setArtifact(null)} />
+          {questionsFor && (
+            <QuestionsSheet
+              open
+              onOpenChange={(o) => {
+                if (!o) setQuestionsFor(null)
+              }}
+              questions={questionsFor.block.questions}
+              onSubmit={(answers) => void submitAnswers(answers)}
+            />
+          )}
         </>
       )}
     </AppShell>

@@ -1,3 +1,5 @@
+import { parseQuestionsInner, type QuestionsBlock } from "./questions"
+
 export type ArtifactType =
   | "text/markdown"
   | "text/html"
@@ -16,9 +18,12 @@ export interface ArtifactBlock {
 export type ContentSegment =
   | { kind: "text"; text: string }
   | { kind: "artifact"; artifact: ArtifactBlock }
+  | { kind: "questions"; block: QuestionsBlock }
 
 const OPEN_RE = /<artifact\s+([^>]*?)>/
 const FULL_RE = /<artifact\s+([^>]*?)>\r?\n?([\s\S]*?)\r?\n?<\/artifact>/
+const Q_OPEN_RE = /<questions>/
+const Q_FULL_RE = /<questions>\s*([\s\S]*?)\s*<\/questions>/
 
 function parseAttrs(raw: string): Record<string, string> {
   const attrs: Record<string, string> = {}
@@ -57,48 +62,79 @@ function makeBlock(
 }
 
 /**
- * Split raw assistant text into text/artifact segments.
- * Robust to a partially streamed artifact at the tail.
+ * Split raw assistant text into text/artifact/questions segments.
+ * Robust to a partially streamed block at the tail.
  */
 export function splitContent(raw: string): ContentSegment[] {
   const segments: ContentSegment[] = []
+  const pushText = (t: string) => {
+    if (t.trim()) segments.push({ kind: "text", text: t })
+  }
   let rest = raw
   let index = 0
 
   while (rest) {
-    const full = FULL_RE.exec(rest)
-    if (full) {
-      const before = rest.slice(0, full.index)
-      if (before.trim()) segments.push({ kind: "text", text: before })
-      segments.push({
-        kind: "artifact",
-        artifact: makeBlock(full[1], full[2], true, index++),
-      })
-      rest = rest.slice(full.index + full[0].length)
+    const fullA = FULL_RE.exec(rest)
+    const fullQ = Q_FULL_RE.exec(rest)
+    if (fullA || fullQ) {
+      if (fullA && (!fullQ || fullA.index <= fullQ.index)) {
+        pushText(rest.slice(0, fullA.index))
+        segments.push({
+          kind: "artifact",
+          artifact: makeBlock(fullA[1], fullA[2], true, index++),
+        })
+        rest = rest.slice(fullA.index + fullA[0].length)
+      } else if (fullQ) {
+        pushText(rest.slice(0, fullQ.index))
+        segments.push({
+          kind: "questions",
+          block: { questions: parseQuestionsInner(fullQ[1]), complete: true },
+        })
+        rest = rest.slice(fullQ.index + fullQ[0].length)
+      }
       continue
     }
-    // Unclosed but fully-opened artifact tag (still streaming)
-    const open = OPEN_RE.exec(rest)
-    if (open) {
-      const before = rest.slice(0, open.index)
-      if (before.trim()) segments.push({ kind: "text", text: before })
-      const partial = rest.slice(open.index + open[0].length)
+
+    // Unclosed but fully-opened blocks (still streaming)
+    const openA = OPEN_RE.exec(rest)
+    const openQ = Q_OPEN_RE.exec(rest)
+    if (openA && (!openQ || openA.index <= openQ.index)) {
+      pushText(rest.slice(0, openA.index))
+      const partial = rest.slice(openA.index + openA[0].length)
       // Hide a trailing partial "</artifact" close tag while it streams in
       const content = partial.replace(/\r?\n?<\/?a?r?t?i?f?a?c?t?>?\s*$/, "")
       segments.push({
         kind: "artifact",
-        artifact: makeBlock(open[1], content, false, index++),
+        artifact: makeBlock(openA[1], content, false, index++),
       })
       return segments
     }
-    // A partially streamed opening tag at the very end — hide it for now
-    const partialOpen = rest.search(/<artifact\b[^>]*$/)
-    if (partialOpen >= 0) {
-      const before = rest.slice(0, partialOpen)
-      if (before.trim()) segments.push({ kind: "text", text: before })
+    if (openQ) {
+      pushText(rest.slice(0, openQ.index))
+      const inner = rest.slice(openQ.index + openQ[0].length)
+      segments.push({
+        kind: "questions",
+        block: { questions: parseQuestionsInner(inner), complete: false },
+      })
       return segments
     }
-    segments.push({ kind: "text", text: rest })
+
+    // Hide a partially streamed tag at the very end ("<artif", "</quest"…)
+    const lt = rest.lastIndexOf("<")
+    if (lt >= 0 && !rest.slice(lt).includes(">")) {
+      const tail = rest
+        .slice(lt + 1)
+        .replace(/^\//, "")
+        .split(/[\s=]/)[0]
+      if (
+        tail.length <= 9 &&
+        ("artifact".startsWith(tail) || "questions".startsWith(tail))
+      ) {
+        pushText(rest.slice(0, lt))
+        return segments
+      }
+    }
+    pushText(rest)
     return segments
   }
   return segments
@@ -106,14 +142,20 @@ export function splitContent(raw: string): ContentSegment[] {
 
 export function extractArtifacts(raw: string): ArtifactBlock[] {
   return splitContent(raw)
-    .filter((s) => s.kind === "artifact")
-    .map((s) => (s as { kind: "artifact"; artifact: ArtifactBlock }).artifact)
+    .filter((s): s is Extract<ContentSegment, { kind: "artifact" }> => s.kind === "artifact")
+    .map((s) => s.artifact)
 }
 
-/** Content with artifact bodies removed (for title generation / previews). */
+/** Content with artifact/question bodies removed (titles, compaction, previews). */
 export function contentWithoutArtifacts(raw: string): string {
   return splitContent(raw)
-    .map((s) => (s.kind === "text" ? s.text : `[Artifact: ${s.artifact.title}]`))
+    .map((s) =>
+      s.kind === "text"
+        ? s.text
+        : s.kind === "artifact"
+          ? `[Artifact: ${s.artifact.title}]`
+          : `[Asked the user ${s.block.questions.length} question${s.block.questions.length === 1 ? "" : "s"}]`,
+    )
     .join("\n")
     .trim()
 }

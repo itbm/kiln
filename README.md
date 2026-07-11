@@ -33,6 +33,12 @@ Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
   every artefact across all chats — searchable, filterable by type, with a
   jump back to the source chat. (The wire tag stays `<artifact>` — US
   spelling is the convention models know.)
+- **Interactive questions** — the assistant can end a reply with up to four
+  multiple-choice questions (a `<questions>` block, like Claude's question
+  chips). They pop up as a sheet with next/back and a review-then-submit
+  step (a single question submits directly), always with a free-text
+  option. Dismiss the sheet to read the chat and reopen it from the
+  question card in the conversation; answers go back as a normal message.
 - **Attachments** — capability-aware, driven by each model's provider
   metadata: photos (auto-downscaled) for vision models on **both**
   providers — Ollama takes base64 images natively per its vision API;

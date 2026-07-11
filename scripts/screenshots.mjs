@@ -90,6 +90,21 @@ await shot(page, "12-images-light")
 await page.goto(`${BASE}/artefacts`, { waitUntil: "networkidle" })
 await shot(page, "23-artefacts-light")
 
+// interactive questions: card, sheet, review step
+await page.goto(`${BASE}/chat/demo-quiz`, { waitUntil: "networkidle" })
+await shot(page, "26-questions-card-light")
+await page.getByText("A few questions for you").click()
+await page.waitForTimeout(500)
+await shot(page, "27-questions-sheet-light")
+await page.getByText("Ghost (polished, batteries included)").click()
+await page.getByRole("button", { name: "Next" }).click()
+await page.getByText("Markdown files in git").click()
+await page.getByRole("button", { name: "Review" }).click()
+await page.waitForTimeout(300)
+await shot(page, "28-questions-review-light")
+await page.keyboard.press("Escape")
+await page.waitForTimeout(400)
+
 // effort menu
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
 await page.getByText("Effort", { exact: true }).click()
