@@ -62,6 +62,6 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   streams, temp chats, dialogs.
 - `src/lib/compact.ts`, `commands.ts`, `versions.ts`, `artifacts.ts` —
   context compaction, slash commands, response versions, artifact parsing.
-- `deploy/nginx.conf` + `Dockerfile` + `docker-compose.yml` — hardened
+- `deploy/nginx.conf` + `Dockerfile` + `compose.yaml` — hardened
   runtime: read-only fs, tmpfs /tmp only, no access logs, no proxy
   buffering to disk, cookies stripped on the relay.

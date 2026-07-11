@@ -1,5 +1,5 @@
 # Production compose: runs the prebuilt image from GHCR instead of building
-# locally. Same hardening as docker-compose.yml.
+# locally. Same hardening as compose.yaml.
 #
 #   docker compose -f compose.prod.yaml up -d
 #
@@ -14,7 +14,7 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
-    # ---- hardening (keep in sync with docker-compose.yml) ----
+    # ---- hardening (keep in sync with compose.yaml) ----
     read_only: true
     tmpfs:
       - /tmp:mode=1777,size=64m
