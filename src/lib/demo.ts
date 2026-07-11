@@ -115,7 +115,7 @@ export async function seedDemo(): Promise<void> {
   // Model cache signature must match the (now keyed) settings, or the next
   // refresh would wipe the demo catalogue.
   const { useModels, modelsSignature } = await import("@/stores/models")
-  const cache = { ...MODELS, signature: modelsSignature() }
+  const cache = { ...MODELS, signature: modelsSignature(), v: 2 }
   localStorage.setItem("amber-models-cache", JSON.stringify(cache))
   useModels.setState(cache)
 

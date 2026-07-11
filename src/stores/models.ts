@@ -5,6 +5,8 @@ import { fetchOllamaModels } from "@/lib/providers/ollama"
 import { getSettings } from "./settings"
 
 const CACHE_KEY = "amber-models-cache"
+/** bump when ModelInfo gains fields, so stale caches refetch immediately */
+const CACHE_VERSION = 2
 
 interface ModelsCache {
   openrouter: ModelInfo[]
@@ -12,6 +14,7 @@ interface ModelsCache {
   fetchedAt: number
   /** which keys/endpoint the cache was fetched with */
   signature?: string
+  v?: number
 }
 
 /** Models are only fetched for providers with a key configured. */
@@ -23,11 +26,14 @@ export function modelsSignature(): string {
 function loadCache(): ModelsCache {
   try {
     const raw = localStorage.getItem(CACHE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const cache = JSON.parse(raw) as ModelsCache
+      if (cache.v === CACHE_VERSION) return cache
+    }
   } catch {
     /* corrupted cache */
   }
-  return { openrouter: [], ollama: [], fetchedAt: 0 }
+  return { openrouter: [], ollama: [], fetchedAt: 0, v: CACHE_VERSION }
 }
 
 interface ModelsState extends ModelsCache {
@@ -74,6 +80,7 @@ export const useModels = create<ModelsState>()((set, get) => ({
       ollama: s.ollamaKey ? (ol ?? get().ollama) : [],
       fetchedAt: Date.now(),
       signature: sig,
+      v: CACHE_VERSION,
     }
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(next))

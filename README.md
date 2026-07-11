@@ -26,10 +26,13 @@ Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
   (later messages are replaced after a confirm); regenerating a reply keeps
   every attempt with a Claude-style ‹ 1/2 › version switcher, including
   when you switch model between attempts.
-- **Artifacts** — the assistant can emit Markdown documents, self-contained
+- **Artefacts** — the assistant can emit Markdown documents, self-contained
   HTML pages, code files and SVGs as tappable cards with a full-screen
   viewer: rendered preview (sandboxed iframe for HTML/SVG), source view,
-  copy / download / open.
+  copy / download / open. An **Artefacts** section in the sidebar collects
+  every artefact across all chats — searchable, filterable by type, with a
+  jump back to the source chat. (The wire tag stays `<artifact>` — US
+  spelling is the convention models know.)
 - **Attachments** — photos (auto-downscaled), text/code files (inlined), and
   PDFs (OpenRouter models only).
 - **Providers** — OpenRouter and Ollama cloud, with live model fetching

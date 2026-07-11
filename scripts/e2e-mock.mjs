@@ -73,6 +73,7 @@ await page.addInitScript(() => {
   const models = {
     fetchedAt: Date.now(),
     signature: "1:0:/api/ollama",
+    v: 2,
     ollama: [],
     openrouter: [
       {

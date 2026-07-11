@@ -86,6 +86,10 @@ await shot(page, "11-settings-skills-light")
 await page.goto(`${BASE}/images/demo-images`, { waitUntil: "networkidle" })
 await shot(page, "12-images-light")
 
+// artefacts gallery
+await page.goto(`${BASE}/artefacts`, { waitUntil: "networkidle" })
+await shot(page, "23-artefacts-light")
+
 // effort menu
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
 await page.getByText("Effort", { exact: true }).click()

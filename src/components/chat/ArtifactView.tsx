@@ -24,7 +24,7 @@ import {
 } from "@/lib/artifacts"
 import { cn } from "@/lib/utils"
 
-function artifactIcon(type: ArtifactBlock["type"]) {
+export function artifactIcon(type: ArtifactBlock["type"]) {
   switch (type) {
     case "text/html":
       return GlobeIcon
@@ -37,7 +37,7 @@ function artifactIcon(type: ArtifactBlock["type"]) {
   }
 }
 
-function typeLabel(a: ArtifactBlock): string {
+export function typeLabel(a: ArtifactBlock): string {
   switch (a.type) {
     case "text/html":
       return "Web page"

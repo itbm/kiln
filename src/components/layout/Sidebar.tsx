@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
+  AmphoraIcon,
   CloudUploadIcon,
   DownloadIcon,
   GhostIcon,
@@ -218,33 +219,35 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="space-y-0.5 px-2 pt-2">
-        <button
-          onClick={() => go("/")}
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium text-primary hover:bg-accent/60",
-            location.pathname === "/" && "bg-accent",
-          )}
-        >
-          <SquarePenIcon className="size-4" /> New chat
-        </button>
-        <button
-          onClick={() => go("/images")}
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium hover:bg-accent/60",
-            location.pathname.startsWith("/images") &&
-              "bg-accent text-primary",
-          )}
-        >
-          <ImageIcon
-            className={cn(
-              "size-4",
-              location.pathname.startsWith("/images")
-                ? "text-primary"
-                : "text-muted-foreground",
-            )}
-          />{" "}
-          Images
-        </button>
+        {(
+          [
+            { path: "/", label: "New chat", icon: SquarePenIcon, exact: true },
+            { path: "/images", label: "Images", icon: ImageIcon, exact: false },
+            { path: "/artefacts", label: "Artefacts", icon: AmphoraIcon, exact: false },
+          ] as const
+        ).map((item) => {
+          const active = item.exact
+            ? location.pathname === item.path
+            : location.pathname.startsWith(item.path)
+          return (
+            <button
+              key={item.path}
+              onClick={() => go(item.path)}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium hover:bg-accent/60",
+                active && "bg-accent text-primary",
+              )}
+            >
+              <item.icon
+                className={cn(
+                  "size-4",
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+              {item.label}
+            </button>
+          )
+        })}
       </div>
 
       <div className="px-2 py-2">
