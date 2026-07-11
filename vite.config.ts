@@ -59,6 +59,9 @@ export default defineConfig({
       workbox: {
         importScripts: ["sw-notifications.js"],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        // iOS reads launch images at add-to-home-screen time, never through
+        // the SW — keep the ~2.5 MB of them out of the offline precache
+        globIgnores: ["splash/**"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],

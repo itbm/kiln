@@ -151,8 +151,11 @@ export function ModelPicker({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="!max-h-[92dvh] h-[92dvh]">
+    // repositionInputs off: vaul's built-in keyboard handling stacks inline
+    // height/bottom on top of the viewport resize and squashes the sheet —
+    // --app-height/--kb-inset (see lib/viewport.ts) handle the keyboard instead
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+      <DrawerContent className="h-[calc(var(--app-height)*0.92)] !max-h-[calc(var(--app-height)*0.92)] !bottom-[var(--kb-inset)]">
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <DrawerTitle className="text-[15px] font-semibold">
             {imageOnly ? "Choose image model" : "Choose model"}

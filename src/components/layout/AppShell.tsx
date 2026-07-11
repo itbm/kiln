@@ -12,7 +12,7 @@ export function AppShell({
   const isDesktop = useIsDesktop()
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden">
+    <div className="flex h-[var(--app-height)] w-full overflow-hidden">
       {isDesktop && (
         <aside className="w-72 shrink-0 border-r border-sidebar-border">
           <SidebarContent />

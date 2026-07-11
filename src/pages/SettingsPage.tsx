@@ -359,7 +359,7 @@ export default function SettingsPage() {
   const promptDirty = s.systemPrompt !== null
 
   return (
-    <div className="mx-auto flex h-dvh max-w-2xl flex-col">
+    <div className="mx-auto flex h-[var(--app-height)] max-w-2xl flex-col">
       <header className="pt-safe">
         <div className="flex h-12 items-center gap-1 px-2">
           <Button variant="ghost" size="icon-sm" aria-label="Back" onClick={() => navigate(-1)}>

@@ -25,6 +25,7 @@ node scripts/e2e-mock.mjs      # end-to-end suite against a mocked provider — 
 node scripts/verify-fresh.mjs  # first-run + key-gated live model fetch checks
 npm run shots                  # regenerate the screenshot set into shots/
 npm run icons                  # regenerate PWA icons from public/icons/icon.svg
+npm run splash                 # regenerate iOS launch images + their index.html tags
 ```
 
 Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`

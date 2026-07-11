@@ -151,6 +151,21 @@ export default function ChatPage() {
     if (el && nearBottom.current) el.scrollTop = el.scrollHeight
   }, [messages.length, liveLen, chatId])
 
+  // when the on-screen keyboard opens the scroll area shrinks — keep the
+  // latest message in view instead of letting the composer cover it
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const onResize = () => {
+      requestAnimationFrame(() => {
+        const el = scrollRef.current
+        if (el && nearBottom.current) el.scrollTop = el.scrollHeight
+      })
+    }
+    vv.addEventListener("resize", onResize)
+    return () => vv.removeEventListener("resize", onResize)
+  }, [])
+
   const onScroll = () => {
     const el = scrollRef.current
     if (!el) return
