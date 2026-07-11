@@ -1,0 +1,24 @@
+# Production compose: runs the prebuilt image from GHCR instead of building
+# locally. Same hardening as docker-compose.yml.
+#
+#   docker compose -f compose.prod.yaml up -d
+#
+# Pin a version by replacing :latest with a VERSION tag, e.g. :0.2.0.
+services:
+  kiln:
+    image: ghcr.io/itbm/kiln:latest
+    # re-check GHCR for a newer :latest on every `up -d`
+    pull_policy: always
+    container_name: kiln
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+    # ---- hardening (keep in sync with docker-compose.yml) ----
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

@@ -98,12 +98,14 @@ docker run -d --name kiln -p 8080:8080 --restart unless-stopped kiln
 
 CI publishes `ghcr.io/itbm/kiln` on every push to `main`, tagged `latest`
 and with the contents of `VERSION` (amd64 + arm64). Pull requests build the
-image as a check but never push. To use it, swap `build: .` in
-docker-compose.yml for:
+image as a check but never push. `compose.prod.yaml` runs the prebuilt
+image (with `pull_policy: always`, so `up -d` picks up new releases):
 
-```yaml
-    image: ghcr.io/itbm/kiln:latest   # or a pinned version, e.g. :0.2.0
+```bash
+docker compose -f compose.prod.yaml up -d
 ```
+
+Pin a version by editing its `image:` tag, e.g. `ghcr.io/itbm/kiln:0.2.0`.
 
 Then on your phone, open the URL, and:
 
