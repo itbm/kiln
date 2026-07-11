@@ -9,6 +9,19 @@ touch it.
 
 Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
 
+## Screenshots
+
+Shown with Ollama cloud models (GLM-5.2, gpt-oss and friends). Seeded demo
+data — regenerate any time with `npm run shots`.
+
+| New chat | Chat | Reasoning | Model picker |
+| :---: | :---: | :---: | :---: |
+| ![New chat](docs/screenshots/new-chat.png) | ![Streaming markdown chat](docs/screenshots/chat.png) | ![Thinking trace](docs/screenshots/reasoning.png) | ![Model picker](docs/screenshots/model-picker.png) |
+
+| Artefacts | Questions | Sidebar | Dark mode |
+| :---: | :---: | :---: | :---: |
+| ![Artifact viewer](docs/screenshots/artifact.png) | ![Interactive questions](docs/screenshots/questions.png) | ![Sidebar](docs/screenshots/sidebar.png) | ![Dark mode](docs/screenshots/chat-dark.png) |
+
 ## Features
 
 - **Chat & history** — streaming markdown chat with code highlighting, tables,
@@ -158,7 +171,14 @@ every preflight is rejected (405/301 with no `Access-Control-Allow-*`
 headers), and authenticated requests always preflight because of the
 `Authorization` header. The bundled nginx therefore forwards
 `/api/ollama/*` → `https://ollama.com/*` (streaming enabled), and the app's
-default Ollama endpoint is `/api/ollama`. Nothing to configure. You can
+default Ollama endpoint is `/api/ollama`. Nothing to configure.
+
+The relay is same-origin and path-based — no port is baked in anywhere. The
+app calls it relative to whatever URL you're browsing on, so it works
+identically on `http://host:8080`, behind a reverse proxy on 443, or any
+other published port; nginx is configured to only ever emit relative
+redirects so the container's internal port (8080) never leaks into
+`Location` headers. You can
 also point the endpoint at a LAN Ollama instance
 (`http://192.168.x.x:11434`) if you export `OLLAMA_ORIGINS` there.
 OpenRouter and Tavily are called directly from the device.
@@ -221,3 +241,7 @@ Export/Import, so a future backend can round-trip it.
 React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · shadcn/ui (Radix) ·
 Dexie (IndexedDB) · Zustand · react-markdown + highlight.js ·
 vite-plugin-pwa (Workbox) · nginx (Docker)
+
+## License
+
+[Apache License 2.0](LICENSE)

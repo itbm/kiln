@@ -67,10 +67,10 @@ await shot(page, "07-chat-reasoning-light")
 
 // model picker
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
-await page.getByText("Claude Sonnet 4.5").click()
+await page.getByText("glm-5.2", { exact: true }).click()
 await page.waitForTimeout(600)
 await shot(page, "08-model-picker-light")
-await page.getByPlaceholder("Search models…").fill("gem")
+await page.getByPlaceholder("Search models…").fill("glm")
 await shot(page, "09-model-picker-search-light")
 await page.keyboard.press("Escape")
 

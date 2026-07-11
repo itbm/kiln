@@ -20,33 +20,32 @@ const OL = (
   opts: Partial<ModelInfo> = {},
 ): ModelInfo => ({ id, name: id, provider: "ollama", ctx, tools: true, ...opts })
 
-const EFFORTS_FULL = ["xhigh", "high", "medium", "low"]
+// Demo catalogue sticks to open models available on Ollama cloud (mirrored
+// on OpenRouter where sensible) so screenshots and the seeded UI stay
+// provider-neutral.
 const MODELS: { openrouter: ModelInfo[]; ollama: ModelInfo[]; fetchedAt: number } = {
   fetchedAt: now,
   openrouter: [
-    OR("anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5", 1_000_000, { vision: true, reasoning: true, efforts: EFFORTS_FULL, defaultEffort: "medium", pricing: { prompt: 3, completion: 15 } }),
-    OR("anthropic/claude-opus-4.1", "Claude Opus 4.1", 200_000, { vision: true, reasoning: true, efforts: EFFORTS_FULL, defaultEffort: "medium", pricing: { prompt: 15, completion: 75 } }),
-    OR("anthropic/claude-haiku-4.5", "Claude Haiku 4.5", 200_000, { vision: true, reasoning: true, efforts: EFFORTS_FULL, defaultEffort: "medium", pricing: { prompt: 1, completion: 5 } }),
-    OR("openai/gpt-5.1", "GPT-5.1", 400_000, { vision: true, reasoning: true, efforts: [...EFFORTS_FULL, "none"], defaultEffort: "medium", pricing: { prompt: 1.25, completion: 10 } }),
-    OR("openai/gpt-5-mini", "GPT-5 Mini", 400_000, { vision: true, reasoning: true, efforts: [...EFFORTS_FULL, "none"], defaultEffort: "medium", pricing: { prompt: 0.25, completion: 2 } }),
-    OR("google/gemini-2.5-pro", "Gemini 2.5 Pro", 1_048_576, { vision: true, reasoning: true, efforts: ["high", "medium", "low"], defaultEffort: "high", pricing: { prompt: 1.25, completion: 10 } }),
-    OR("google/gemini-2.5-flash", "Gemini 2.5 Flash", 1_048_576, { vision: true, reasoning: true, reasoningToggle: true, pricing: { prompt: 0.3, completion: 2.5 } }),
-    OR("google/gemini-2.5-flash-image", "Gemini 2.5 Flash Image (Nano Banana)", 32_768, { vision: true, imageOutput: true, pricing: { prompt: 0.3, completion: 2.5 } }),
-    OR("openai/gpt-image-1", "GPT Image 1", 32_000, { vision: true, imageOutput: true, pricing: { prompt: 5, completion: 40 } }),
-    OR("meta-llama/llama-4-maverick", "Llama 4 Maverick", 1_048_576, { vision: true, pricing: { prompt: 0.15, completion: 0.6 } }),
-    OR("mistralai/mistral-large-2411", "Mistral Large", 131_072, { pricing: { prompt: 2, completion: 6 } }),
-    OR("deepseek/deepseek-chat-v3.1", "DeepSeek V3.1", 163_840, { reasoning: true, reasoningToggle: true, pricing: { prompt: 0.27, completion: 1 } }),
-    OR("x-ai/grok-4", "Grok 4", 256_000, { vision: true, reasoning: true, pricing: { prompt: 3, completion: 15 } }),
+    OR("z-ai/glm-5.2", "GLM-5.2", 200_000, { reasoning: true, reasoningToggle: true, pricing: { prompt: 0.6, completion: 2.2 } }),
+    OR("deepseek/deepseek-v3.2", "DeepSeek V3.2", 163_840, { reasoning: true, reasoningToggle: true, pricing: { prompt: 0.27, completion: 1 } }),
+    OR("openai/gpt-oss-120b", "gpt-oss 120B", 131_072, { reasoning: true, efforts: ["high", "medium", "low"], defaultEffort: "medium", pricing: { prompt: 0.09, completion: 0.45 } }),
+    OR("qwen/qwen3.5-397b", "Qwen3.5 397B", 262_144, { reasoning: true, reasoningToggle: true, pricing: { prompt: 0.4, completion: 1.6 } }),
     OR("qwen/qwen3-coder", "Qwen3 Coder", 262_144, { pricing: { prompt: 0.22, completion: 0.95 } }),
-    OR("moonshotai/kimi-k2", "Kimi K2", 131_072, { pricing: { prompt: 0.55, completion: 2.2 } }),
+    OR("moonshotai/kimi-k2.5", "Kimi K2.5", 256_000, { reasoning: true, reasoningToggle: true, pricing: { prompt: 0.55, completion: 2.2 } }),
+    OR("mistralai/mistral-large-3", "Mistral Large 3", 262_144, { vision: true, pricing: { prompt: 2, completion: 6 } }),
+    OR("meta-llama/llama-4-maverick", "Llama 4 Maverick", 1_048_576, { vision: true, pricing: { prompt: 0.15, completion: 0.6 } }),
+    OR("qwen/qwen-image", "Qwen Image", 32_768, { imageOutput: true, pricing: { prompt: 0.3, completion: 2.5 } }),
   ],
   ollama: [
+    OL("glm-5.2", 200_000, { reasoning: true, reasoningToggle: true }),
+    OL("glm-4.7", 200_000, { reasoning: true, reasoningToggle: true }),
     OL("gpt-oss:120b", 131_072, { reasoning: true, efforts: ["high", "medium", "low"], defaultEffort: "medium" }),
     OL("gpt-oss:20b", 131_072, { reasoning: true, efforts: ["high", "medium", "low"], defaultEffort: "medium" }),
-    OL("deepseek-v3.1:671b", 163_840, { reasoning: true, reasoningToggle: true }),
+    OL("deepseek-v3.2", 163_840, { reasoning: true, reasoningToggle: true }),
     OL("qwen3-coder:480b", 262_144),
-    OL("kimi-k2:1t", 131_072),
-    OL("gemma3:27b", 131_072, { vision: true }),
+    OL("kimi-k2.5", 256_000, { reasoning: true, reasoningToggle: true }),
+    OL("gemma4:31b", 131_072, { vision: true }),
+    OL("minimax-m3", 196_608, { reasoning: true, reasoningToggle: true }),
   ],
 }
 
@@ -83,12 +82,12 @@ export async function seedDemo(): Promise<void> {
   useSettings.setState({
     openrouterKey: st.openrouterKey || "sk-or-demo-not-a-real-key",
     ollamaKey: st.ollamaKey || "demo-not-a-real-key",
-    lastModel: { provider: "openrouter", model: "anthropic/claude-sonnet-4.5" },
-    lastImageModel: { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
+    lastModel: { provider: "ollama", model: "glm-5.2" },
+    lastImageModel: { provider: "openrouter", model: "qwen/qwen-image" },
     favoriteModels: [
-      "openrouter:anthropic/claude-sonnet-4.5",
+      "ollama:glm-5.2",
       "ollama:gpt-oss:120b",
-      "openrouter:google/gemini-2.5-flash",
+      "ollama:qwen3-coder:480b",
     ],
     skills: st.skills.length
       ? st.skills
@@ -130,8 +129,8 @@ export async function seedDemo(): Promise<void> {
       createdAt: now - 5 * H,
       updatedAt: now - 5 * H,
       titleGenerated: true,
-      provider: "openrouter",
-      model: "anthropic/claude-sonnet-4.5",
+      provider: "ollama",
+      model: "glm-5.2",
       effort: "auto",
       ...chat,
     } as Chat
@@ -162,15 +161,15 @@ export async function seedDemo(): Promise<void> {
       },
       {
         role: "assistant",
-        modelName: "Claude Sonnet 4.5",
+        modelName: "glm-5.2",
         effort: "auto",
         versions: [
           {
             content:
               "Here's a quick outline for 5 days: Higashiyama temples, Arashiyama bamboo, a Kurama day-hike, Nishiki market food crawl, and a flexible last day around Fushimi Inari. Want me to expand it into a full plan?",
-            provider: "openrouter",
-            model: "google/gemini-2.5-flash",
-            modelName: "Gemini 2.5 Flash",
+            provider: "ollama",
+            model: "deepseek-v3.2",
+            modelName: "deepseek-v3.2",
             effort: "auto",
             status: "done",
             createdAt: now - 0.62 * H,
@@ -217,7 +216,7 @@ Want me to turn this into a printable itinerary with opening hours and walking d
       },
       {
         role: "assistant",
-        modelName: "Claude Sonnet 4.5",
+        modelName: "glm-5.2",
         content: `Here's a self-contained landing page with a warm palette and everything inline:
 
 <artifact identifier="ember-oak-landing" type="text/html" title="Ember & Oak — Landing page">
@@ -341,7 +340,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
       },
       {
         role: "assistant",
-        modelName: "Claude Sonnet 4.5",
+        modelName: "glm-5.2",
         content: `Happy to help — two choices shape everything else, so let me ask first:
 
 <questions>
@@ -367,7 +366,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
       createdAt: now - 8 * H,
       updatedAt: now - 8 * H,
       provider: "openrouter",
-      model: "google/gemini-2.5-flash-image",
+      model: "qwen/qwen-image",
     },
     list: [
       {
@@ -383,9 +382,9 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
         chatId: "demo-images",
         role: "assistant",
         content: "",
-        modelName: "Gemini 2.5 Flash Image (Nano Banana)",
+        modelName: "Qwen Image",
         provider: "openrouter",
-        model: "google/gemini-2.5-flash-image",
+        model: "qwen/qwen-image",
         images: [
           { id: uid(), dataUrl: paintDemoImage(275, 210, "demo render") },
           { id: uid(), dataUrl: paintDemoImage(15, 320, "demo render") },
