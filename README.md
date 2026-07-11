@@ -103,6 +103,22 @@ clipboard. Put Kiln behind your usual reverse proxy (Caddy, Traefik,
 nginx-proxy-manager…) with a certificate. Plain `http://localhost` works for
 desktop testing only.
 
+### Container hardening & privacy
+
+The compose file runs Kiln as an immutable, minimal-privilege container:
+
+- **Read-only root filesystem** (`read_only: true`) — the only writable path
+  is `/tmp`, an in-memory tmpfs holding nginx's pid and temp paths, wiped on
+  stop. Nothing can be persisted inside the container, by anyone.
+- **Non-root** (`nginx-unprivileged`, uid 101) with **all capabilities
+  dropped** and `no-new-privileges`.
+- **No access logs** — who chatted and when is never recorded (errors still
+  go to stderr for `docker logs`).
+- **The Ollama relay never spools chat data to disk** — request and response
+  buffering to temp files is disabled in both directions — and it strips
+  cookies both ways plus client-identifying headers, so the upstream sees
+  only your API key, never a tracking cookie or the phone's address.
+
 ### The Ollama proxy
 
 Ollama cloud doesn't send CORS headers, so browsers can't call it directly —

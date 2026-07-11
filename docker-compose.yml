@@ -3,5 +3,17 @@ services:
     build: .
     container_name: kiln
     ports:
-      - "8080:80"
+      - "8080:8080"
     restart: unless-stopped
+
+    # ---- hardening ----
+    # Immutable container: nothing can be written anywhere except /tmp,
+    # which is an in-memory tmpfs (nginx pid + temp paths) that vanishes
+    # on stop. Chat traffic through the Ollama relay never touches disk.
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
