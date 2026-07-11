@@ -1,6 +1,6 @@
-# Amber — a local-first mobile AI chat PWA
+# Kiln — a local-first mobile AI chat PWA
 
-Amber is a mobile-first AI chat app you install from your own server as a PWA
+Kiln is a mobile-first AI chat app you install from your own server as a PWA
 — no App Store required. It talks **directly from your phone to the model
 providers** (OpenRouter, Ollama cloud) with your own API keys, and stores
 **everything on the device** (IndexedDB). The server's only jobs are to hand
@@ -84,8 +84,8 @@ docker compose up -d --build
 Or without compose:
 
 ```bash
-docker build -t amber .
-docker run -d --name amber -p 8080:80 --restart unless-stopped amber
+docker build -t kiln .
+docker run -d --name kiln -p 8080:80 --restart unless-stopped kiln
 ```
 
 Then on your phone, open the URL, and:
@@ -99,7 +99,7 @@ API keys (and a Tavily key if you want web search).
 ### HTTPS
 
 iOS requires a secure context for service workers, notifications and
-clipboard. Put Amber behind your usual reverse proxy (Caddy, Traefik,
+clipboard. Put Kiln behind your usual reverse proxy (Caddy, Traefik,
 nginx-proxy-manager…) with a certificate. Plain `http://localhost` works for
 desktop testing only.
 
@@ -138,7 +138,7 @@ explore the UI without API keys.
 
 ```jsonc
 {
-  "app": "amber",
+  "app": "kiln",
   "version": 1,
   "exportedAt": 1730000000000,
   "chats": [ { "id": "…", "title": "…", … } ],
@@ -152,7 +152,7 @@ Export/Import, so a future backend can round-trip it.
 ## Honest limitations
 
 - **Backgrounding on iOS**: Safari suspends network for backgrounded PWAs, so
-  a stream can't keep running while you use another app. Amber mitigates
+  a stream can't keep running while you use another app. Kiln mitigates
   rather than pretends: partial output is saved continuously, the chat is
   marked *interrupted*, and **Continue generating** picks the answer back up.
   The optional wake-lock setting avoids the interruption entirely for long

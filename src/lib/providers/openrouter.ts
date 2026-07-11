@@ -14,7 +14,7 @@ function headers(): Record<string, string> {
     Authorization: `Bearer ${getSettings().openrouterKey}`,
     "Content-Type": "application/json",
     "HTTP-Referer": "https://github.com/itbm/mobile-ai-pwa",
-    "X-Title": "Amber",
+    "X-Title": "Kiln",
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Chat } from "./types"
 import { getSettings } from "@/stores/settings"
 
-export const DEFAULT_SYSTEM_PROMPT = `You are Amber, a thoughtful AI assistant in a mobile chat app. Today's date is {{date}}.
+export const DEFAULT_SYSTEM_PROMPT = `You are Kiln, a thoughtful AI assistant in a mobile chat app. Today's date is {{date}}.
 
 ## Style
 - Be warm, direct and genuinely useful. Get to the point — the user is on a phone.

@@ -201,7 +201,7 @@ export default function ImagesPage() {
               <img src={viewer} alt="Full size" className="max-h-full max-w-full rounded-xl" />
               <a
                 href={viewer}
-                download={`amber-image.png`}
+                download={`kiln-image.png`}
                 onClick={(e) => e.stopPropagation()}
                 className="absolute bottom-8 rounded-full bg-white/90 px-4 py-2 text-[13px] font-medium text-black"
               >

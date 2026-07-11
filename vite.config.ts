@@ -15,8 +15,8 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icons/apple-touch-icon.png"],
       manifest: {
-        name: "Amber — AI Chat",
-        short_name: "Amber",
+        name: "Kiln — AI Chat",
+        short_name: "Kiln",
         description:
           "A local-first AI chat app. Your keys, your chats, your device.",
         theme_color: "#faf9f5",

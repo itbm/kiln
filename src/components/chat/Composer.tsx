@@ -240,7 +240,7 @@ export function Composer(props: ComposerProps) {
               send()
             }
           }}
-          placeholder={props.placeholder ?? "Message Amber…"}
+          placeholder={props.placeholder ?? "Message Kiln…"}
           rows={1}
           className="w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[16px] leading-relaxed outline-none placeholder:text-muted-foreground/70 md:text-[15px]"
         />

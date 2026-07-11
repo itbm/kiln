@@ -9,7 +9,7 @@ export function setupServiceWorker(): void {
   const updateSW = registerSW({
     immediate: true,
     onNeedRefresh() {
-      toast("A new version of Amber is ready", {
+      toast("A new version of Kiln is ready", {
         id: "sw-update",
         duration: Infinity,
         action: {

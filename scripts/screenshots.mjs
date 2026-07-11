@@ -93,10 +93,10 @@ await shot(page, "17-effort-menu-light")
 await page.keyboard.press("Escape")
 
 // slash command menu
-await page.getByPlaceholder("Message Amber…").fill("/")
+await page.getByPlaceholder("Message Kiln…").fill("/")
 await page.waitForTimeout(300)
 await shot(page, "21-slash-menu-light")
-await page.getByPlaceholder("Message Amber…").fill("")
+await page.getByPlaceholder("Message Kiln…").fill("")
 
 // skills sheet from ＋ menu
 await page.getByLabel("More options").click()

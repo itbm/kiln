@@ -3,7 +3,8 @@ import { db, chatMessages } from "./db"
 import { getSettings } from "@/stores/settings"
 
 export interface ChatExport {
-  app: "amber"
+  /** format id — "amber" is the legacy value, still accepted on import */
+  app: "kiln" | "amber"
   version: 1
   exportedAt: number
   chats: Chat[]
@@ -13,30 +14,33 @@ export interface ChatExport {
 export async function exportChatFile(chat: Chat): Promise<void> {
   const messages = await chatMessages(chat.id)
   const payload: ChatExport = {
-    app: "amber",
+    app: "kiln",
     version: 1,
     exportedAt: Date.now(),
     chats: [chat],
     messages,
   }
-  downloadJson(payload, `amber-chat-${slug(chat.title)}.json`)
+  downloadJson(payload, `kiln-chat-${slug(chat.title)}.json`)
 }
 
 export async function exportAllData(): Promise<void> {
   const payload: ChatExport = {
-    app: "amber",
+    app: "kiln",
     version: 1,
     exportedAt: Date.now(),
     chats: await db.chats.toArray(),
     messages: await db.messages.toArray(),
   }
-  downloadJson(payload, `amber-backup-${new Date().toISOString().slice(0, 10)}.json`)
+  downloadJson(payload, `kiln-backup-${new Date().toISOString().slice(0, 10)}.json`)
 }
 
 export async function importData(file: File): Promise<number> {
   const parsed = JSON.parse(await file.text()) as ChatExport
-  if (parsed.app !== "amber" || !Array.isArray(parsed.chats))
-    throw new Error("Not an Amber export file")
+  if (
+    (parsed.app !== "kiln" && parsed.app !== "amber") ||
+    !Array.isArray(parsed.chats)
+  )
+    throw new Error("Not a Kiln export file")
   await db.transaction("rw", db.chats, db.messages, async () => {
     await db.chats.bulkPut(parsed.chats)
     await db.messages.bulkPut(parsed.messages)
@@ -60,7 +64,7 @@ export async function uploadChatToServer(chat: Chat): Promise<void> {
       ...(syncToken ? { Authorization: `Bearer ${syncToken}` } : {}),
     },
     body: JSON.stringify({
-      app: "amber",
+      app: "kiln",
       version: 1,
       exportedAt: Date.now(),
       chats: [chat],

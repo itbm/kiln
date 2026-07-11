@@ -1,11 +1,12 @@
 import Dexie, { type Table } from "dexie"
 import type { Chat, Message } from "./types"
 
-class AmberDB extends Dexie {
+class KilnDB extends Dexie {
   chats!: Table<Chat, string>
   messages!: Table<Message, string>
 
   constructor() {
+    // db name predates the Kiln rebrand — kept so existing installs keep their data
     super("amber")
     this.version(1).stores({
       chats: "id, updatedAt, kind",
@@ -14,7 +15,7 @@ class AmberDB extends Dexie {
   }
 }
 
-export const db = new AmberDB()
+export const db = new KilnDB()
 
 /** Mark any messages left "streaming" by a killed session as interrupted. */
 export async function recoverInterrupted(): Promise<void> {

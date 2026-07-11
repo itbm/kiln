@@ -574,14 +574,14 @@ export default function SettingsPage() {
         <Section
           icon={<ServerIcon className="size-4.5" />}
           title="Server (optional)"
-          description="Amber runs fully on-device. Add a server to push chats to it."
+          description="Kiln runs fully on-device. Add a server to push chats to it."
         >
           <div className="space-y-1.5">
             <Label className="text-[13px]">Server URL</Label>
             <Input
               value={s.syncUrl}
               onChange={(e) => s.set({ syncUrl: e.target.value.trim() })}
-              placeholder="https://amber.example.com/api"
+              placeholder="https://kiln.example.com/api"
               className="font-mono text-[16px] md:text-[13px]"
             />
           </div>
@@ -655,7 +655,7 @@ export default function SettingsPage() {
         </Section>
 
         <p className="pb-safe pt-2 text-center text-[11.5px] text-muted-foreground">
-          Amber · local-first AI chat · v{__APP_VERSION__}
+          Kiln · local-first AI chat · v{__APP_VERSION__}
         </p>
       </div>
 

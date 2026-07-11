@@ -145,7 +145,7 @@ const errors = []
 page.on("pageerror", (e) => errors.push(e.message))
 
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
-await page.getByPlaceholder("Message Amber…").fill("What espresso beans should I buy?")
+await page.getByPlaceholder("Message Kiln…").fill("What espresso beans should I buy?")
 await page.getByLabel("Send").click()
 
 // tool chip appears
@@ -180,14 +180,14 @@ console.log("ok: regenerate created version 2/2 and switcher works")
 await page.screenshot({ path: "shots/e2e-versions.png" })
 
 // --- /help command ---
-await page.getByPlaceholder("Message Amber…").fill("/help")
+await page.getByPlaceholder("Message Kiln…").fill("/help")
 await page.getByLabel("Send").click()
 await page.getByText("Slash commands").waitFor({ timeout: 5000 })
 await page.getByRole("button", { name: "OK" }).click()
 console.log("ok: /help dialog")
 
 // --- second send triggers auto-compaction (ctx=700 in the mock model) ---
-await page.getByPlaceholder("Message Amber…").fill("And which grinder should I get?")
+await page.getByPlaceholder("Message Kiln…").fill("And which grinder should I get?")
 await page.getByLabel("Send").click()
 await page
   .getByText(/Compacted — messages above are summarised/)

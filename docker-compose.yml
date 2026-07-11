@@ -1,7 +1,7 @@
 services:
-  amber:
+  kiln:
     build: .
-    container_name: amber
+    container_name: kiln
     ports:
       - "8080:80"
     restart: unless-stopped

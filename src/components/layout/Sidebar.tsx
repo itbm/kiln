@@ -210,9 +210,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="flex items-center justify-between px-4 pb-1 pt-safe">
         <button
           onClick={() => go("/")}
-          className="pt-3 font-serif text-[22px] font-semibold tracking-tight"
+          className="flex items-center gap-2 pt-3 font-serif text-[22px] font-semibold tracking-tight"
         >
-          Amber
+          <img src="/icons/icon.svg" alt="" className="size-6 rounded-md" />
+          Kiln
         </button>
       </div>
 

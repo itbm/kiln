@@ -220,7 +220,7 @@ export const MessageView = memo(function MessageView({
             <a
               key={im.id}
               href={im.dataUrl}
-              download={`amber-${im.id.slice(0, 6)}.png`}
+              download={`kiln-${im.id.slice(0, 6)}.png`}
             >
               <img
                 src={im.dataUrl}
