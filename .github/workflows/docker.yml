@@ -3,6 +3,9 @@ name: Docker
 on:
   push:
     branches: [main]
+    # Publish only when the version is bumped — otherwise a merge without a
+    # bump would overwrite the existing :<VERSION> image on GHCR.
+    paths: [VERSION]
   pull_request:
   workflow_dispatch:
 
@@ -45,7 +48,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # PRs: test that the image builds, never push.
-      # main: build for amd64+arm64 and push :latest + :<VERSION>.
+      # main (VERSION bumped) or manual dispatch: build for amd64+arm64
+      # and push :latest + :<VERSION>.
       - name: Build${{ github.event_name != 'pull_request' && ' and push' || '' }}
         uses: docker/build-push-action@v6
         with:
