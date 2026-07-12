@@ -64,7 +64,7 @@ export default defineConfig({
         globIgnores: ["splash/**"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/splash\//],
         cleanupOutdatedCaches: true,
       },
     }),
