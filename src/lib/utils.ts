@@ -9,6 +9,16 @@ export function uid(): string {
   return crypto.randomUUID()
 }
 
+/**
+ * API keys never contain whitespace, so strip it everywhere — not just the
+ * ends. Keys pasted from email/notes pick up interior line-wrap spaces
+ * (silent 401s), and copies from rendered HTML pick up zero-width characters
+ * that make fetch() reject the Authorization header outright.
+ */
+export function cleanKey(raw: string): string {
+  return raw.replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, "")
+}
+
 export function timeAgo(ts: number): string {
   const diff = Date.now() - ts
   const m = Math.floor(diff / 60000)

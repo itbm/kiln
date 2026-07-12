@@ -4,7 +4,7 @@ import type {
   StreamEvent,
   WireMessage,
 } from "@/lib/types"
-import { dataUrlToBase64, uid } from "@/lib/utils"
+import { cleanKey, dataUrlToBase64, uid } from "@/lib/utils"
 import { getSettings } from "@/stores/settings"
 
 function base(): string {
@@ -16,7 +16,7 @@ function base(): string {
 
 function headers(): Record<string, string> {
   return {
-    Authorization: `Bearer ${getSettings().ollamaKey}`,
+    Authorization: `Bearer ${cleanKey(getSettings().ollamaKey)}`,
     "Content-Type": "application/json",
   }
 }
@@ -26,7 +26,7 @@ export async function checkOllamaKey(
   baseUrl: string,
 ): Promise<string> {
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/tags`, {
-    headers: { Authorization: `Bearer ${key}` },
+    headers: { Authorization: `Bearer ${cleanKey(key)}` },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json = await res.json()

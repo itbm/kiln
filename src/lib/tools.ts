@@ -1,5 +1,6 @@
 import type { ToolDef } from "./types"
 import { getSettings } from "@/stores/settings"
+import { cleanKey } from "./utils"
 
 const MAX_TOOL_RESULT = 9000
 
@@ -59,7 +60,7 @@ async function webSearch(query: string, signal?: AbortSignal): Promise<string> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
+      Authorization: `Bearer ${cleanKey(key)}`,
     },
     body: JSON.stringify({
       query,

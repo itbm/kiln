@@ -6,12 +6,13 @@ import type {
   WireToolCall,
 } from "@/lib/types"
 import { getSettings } from "@/stores/settings"
+import { cleanKey } from "@/lib/utils"
 
 const BASE = "https://openrouter.ai/api/v1"
 
 function headers(): Record<string, string> {
   return {
-    Authorization: `Bearer ${getSettings().openrouterKey}`,
+    Authorization: `Bearer ${cleanKey(getSettings().openrouterKey)}`,
     "Content-Type": "application/json",
     "HTTP-Referer": "https://github.com/itbm/mobile-ai-pwa",
     "X-Title": "Kiln",
@@ -53,10 +54,20 @@ export async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
 }
 
 export async function checkOpenRouterKey(key: string): Promise<string> {
-  const res = await fetch(`${BASE}/auth/key`, {
-    headers: { Authorization: `Bearer ${key}` },
+  // GET /key is the documented key-info endpoint (/auth/key is legacy)
+  const res = await fetch(`${BASE}/key`, {
+    headers: { Authorization: `Bearer ${cleanKey(key)}` },
   })
-  if (!res.ok) throw new Error(`Invalid key (HTTP ${res.status})`)
+  if (!res.ok) {
+    let msg = `Invalid key (HTTP ${res.status})`
+    try {
+      const j = await res.json()
+      if (j.error?.message) msg = `${j.error.message} (HTTP ${res.status})`
+    } catch {
+      /* keep generic message */
+    }
+    throw new Error(msg)
+  }
   const json = await res.json()
   return json.data?.label ?? "OK"
 }

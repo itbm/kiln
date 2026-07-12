@@ -43,7 +43,7 @@ import { checkOllamaKey } from "@/lib/providers/ollama"
 import { ensureNotificationPermission } from "@/lib/notify"
 import { exportAllData, importData } from "@/lib/sync"
 import type { Skill } from "@/lib/types"
-import { formatBytes } from "@/lib/utils"
+import { cleanKey, formatBytes } from "@/lib/utils"
 import { confirmDialog } from "@/stores/dialogs"
 import { displayModelName } from "@/stores/models"
 import { useSettings, type ThemePref } from "@/stores/settings"
@@ -101,7 +101,7 @@ function KeyInput({
             type={show ? "text" : "password"}
             autoComplete="off"
             value={value}
-            onChange={(e) => onChange(e.target.value.trim())}
+            onChange={(e) => onChange(cleanKey(e.target.value))}
             placeholder={placeholder}
             className="pr-9 font-mono text-[16px] md:text-[13px]"
           />
