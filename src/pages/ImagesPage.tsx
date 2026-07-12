@@ -19,6 +19,15 @@ import type { Attachment, Chat, ModelRef } from "@/lib/types"
 import { cn, uid } from "@/lib/utils"
 import { useSettings } from "@/stores/settings"
 import { useStream } from "@/stores/stream"
+import { ImageLightbox } from "@/components/chat/ImageLightbox"
+
+function PaintingTile() {
+  return (
+    <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40">
+      <span className="shimmer text-[14px]">Painting…</span>
+    </div>
+  )
+}
 
 export default function ImagesPage() {
   const { chatId } = useParams()
@@ -29,11 +38,9 @@ export default function ImagesPage() {
   const [modelRef, setModelRef] = useState<ModelRef | null>(lastImageModel)
   const [viewer, setViewer] = useState<string | null>(null)
 
-  const generating = useStream((s) => (chatId ? !!s.generating[chatId] : false))
-  const live = useStream((s) => {
-    const id = chatId ? s.generating[chatId] : undefined
-    return id ? s.live[id] : undefined
-  })
+  const streamingId = useStream((s) => (chatId ? s.generating[chatId] : undefined))
+  const generating = !!streamingId
+  const live = useStream((s) => (streamingId ? s.live[streamingId] : undefined))
 
   const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -121,23 +128,32 @@ export default function ImagesPage() {
           ) : (
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <div className="mx-auto max-w-3xl space-y-6 px-4 py-4">
-                {messages.map((m) =>
-                  m.role === "user" ? (
-                    <div key={m.id} className="flex justify-end">
-                      <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-bubble-user px-4 py-2.5 text-[14.5px]">
-                        {m.content}
+                {messages.map((m) => {
+                  if (m.role === "user")
+                    return (
+                      <div key={m.id} className="flex justify-end">
+                        <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-bubble-user px-4 py-2.5 text-[14.5px]">
+                          {m.content}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
+                    )
+                  // while this reply generates, the live stream overlays the
+                  // throttled snapshot Dexie already has (same as MessageView)
+                  const isLive = m.id === streamingId
+                  const images = (isLive ? live?.images : undefined) ?? m.images ?? []
+                  const content = isLive ? live?.content : m.content
+                  return (
                     <div key={m.id}>
-                      {(m.images?.length ?? 0) > 0 && (
+                      {(images.length > 0 || isLive) && (
                         <div
                           className={cn(
                             "grid gap-2",
-                            (m.images!.length > 1 && "grid-cols-2") || "grid-cols-1",
+                            images.length + (isLive ? 1 : 0) > 1
+                              ? "grid-cols-2"
+                              : "grid-cols-1",
                           )}
                         >
-                          {m.images!.map((im) => (
+                          {images.map((im) => (
                             <button key={im.id} onClick={() => setViewer(im.dataUrl)}>
                               <img
                                 src={im.dataUrl}
@@ -146,33 +162,26 @@ export default function ImagesPage() {
                               />
                             </button>
                           ))}
+                          {isLive && <PaintingTile />}
                         </div>
                       )}
-                      {m.content && (
-                        <p className="mt-2 text-[13.5px] text-muted-foreground">{m.content}</p>
+                      {content && (
+                        <p className="mt-2 text-[13.5px] text-muted-foreground">{content}</p>
                       )}
-                      {m.status === "error" && (
+                      {!isLive && m.status === "error" && (
                         <p className="mt-1 text-[13px] text-destructive">{m.error}</p>
                       )}
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {m.modelName ?? m.model}
-                      </div>
+                      {!isLive && (
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {m.modelName ?? m.model}
+                        </div>
+                      )}
                     </div>
-                  ),
-                )}
-                {generating && (
+                  )
+                })}
+                {generating && !messages.some((m) => m.id === streamingId) && (
                   <div className="grid grid-cols-1 gap-2">
-                    {live?.images.map((im) => (
-                      <img
-                        key={im.id}
-                        src={im.dataUrl}
-                        alt="Generated"
-                        className="w-full rounded-2xl border border-border"
-                      />
-                    ))}
-                    <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40">
-                      <span className="shimmer text-[14px]">Painting…</span>
-                    </div>
+                    <PaintingTile />
                   </div>
                 )}
               </div>
@@ -193,22 +202,7 @@ export default function ImagesPage() {
             />
           </div>
 
-          {viewer && (
-            <button
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-              onClick={() => setViewer(null)}
-            >
-              <img src={viewer} alt="Full size" className="max-h-full max-w-full rounded-xl" />
-              <a
-                href={viewer}
-                download={`kiln-image.png`}
-                onClick={(e) => e.stopPropagation()}
-                className="absolute bottom-8 rounded-full bg-white/90 px-4 py-2 text-[13px] font-medium text-black"
-              >
-                Download
-              </a>
-            </button>
-          )}
+          <ImageLightbox src={viewer} onClose={() => setViewer(null)} />
         </>
       )}
     </AppShell>
