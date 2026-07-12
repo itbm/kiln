@@ -87,7 +87,8 @@ data — regenerate any time with `npm run shots`.
   tool-capable models, with inline "Searched …" / "Read …" step chips.
 - **Image generation** — a separate Images studio optimised for generating
   and browsing pictures with image-output models (e.g. Gemini Flash Image
-  on OpenRouter), with full-screen viewing and download.
+  on OpenRouter), with full-screen viewing and download. Generated images
+  also appear in the Artefacts gallery.
 - **Model favourites** — star models in the picker to pin them to a
   Favourites group at the top.
 - **PWA** — installable, offline app shell, light/dark (or follow system),

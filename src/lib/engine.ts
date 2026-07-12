@@ -308,7 +308,9 @@ async function runAssistantTurn(
             reasoningMs = Date.now() - reasoningStart
           content += ev.text
         } else if (ev.type === "image") {
-          images.push({ id: uid(), dataUrl: ev.dataUrl })
+          // some providers repeat the same image in later stream chunks
+          if (!images.some((im) => im.dataUrl === ev.dataUrl))
+            images.push({ id: uid(), dataUrl: ev.dataUrl })
         } else if (ev.type === "tool_calls") {
           toolCalls = ev.calls
         }
