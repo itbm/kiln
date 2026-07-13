@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ModelPicker } from "@/components/chat/ModelPicker"
+import { LicensesDialog } from "@/components/LicensesDialog"
 import { db } from "@/lib/db"
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts"
 import { checkOpenRouterKey } from "@/lib/providers/openrouter"
@@ -351,6 +352,7 @@ export default function SettingsPage() {
   const navigate = useNavigate()
   const s = useSettings()
   const [titlePickerOpen, setTitlePickerOpen] = useState(false)
+  const [licensesOpen, setLicensesOpen] = useState(false)
   const [skillDialog, setSkillDialog] = useState<{ open: boolean; skill: Skill | null }>({
     open: false,
     skill: null,
@@ -747,10 +749,17 @@ export default function SettingsPage() {
         </Section>
 
         <p className="pb-safe pt-2 text-center text-[11.5px] text-muted-foreground">
-          Kiln · local-first AI chat · v{__APP_VERSION__}
+          Kiln · local-first AI chat · v{__APP_VERSION__} ·{" "}
+          <button
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => setLicensesOpen(true)}
+          >
+            licences
+          </button>
         </p>
       </div>
 
+      <LicensesDialog open={licensesOpen} onOpenChange={setLicensesOpen} />
       <ModelPicker
         open={titlePickerOpen}
         onOpenChange={setTitlePickerOpen}

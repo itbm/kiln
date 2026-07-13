@@ -4,6 +4,7 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { VitePWA } from "vite-plugin-pwa"
+import { licenses } from "./scripts/vite-plugin-licenses"
 
 // Single source of truth for the app version, baked in at build time
 // (including docker builds) and shown at the bottom of Settings.
@@ -19,6 +20,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    licenses(__dirname),
     VitePWA({
       registerType: "prompt",
       includeAssets: ["apple-touch-icon.png"],
