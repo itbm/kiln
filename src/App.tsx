@@ -10,6 +10,7 @@ import { requestPersistentStorage, setupServiceWorker } from "@/lib/sw"
 import { useModels } from "@/stores/models"
 import ArtefactsPage from "@/pages/ArtefactsPage"
 import ChatPage from "@/pages/ChatPage"
+import CodePage from "@/pages/CodePage"
 import ImagesPage from "@/pages/ImagesPage"
 import SettingsPage from "@/pages/SettingsPage"
 
@@ -45,6 +46,8 @@ export default function App() {
         <Route path="/chat/:chatId" element={<ChatPage />} />
         <Route path="/images" element={<ImagesPage />} />
         <Route path="/images/:chatId" element={<ImagesPage />} />
+        <Route path="/code" element={<CodePage />} />
+        <Route path="/code/:chatId" element={<CodePage />} />
         <Route path="/artefacts" element={<ArtefactsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<ChatPage />} />

@@ -13,6 +13,7 @@ export async function notifyChatDone(
   chatId: string,
   title: string,
   preview: string,
+  url = `/chat/${chatId}`,
 ): Promise<void> {
   if (!getSettings().notifications) return
   if (document.visibilityState === "visible") return
@@ -26,7 +27,7 @@ export async function notifyChatDone(
       tag: `chat-${chatId}`,
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
-      data: { url: `/chat/${chatId}` },
+      data: { url },
     })
   } catch {
     /* notifications are best-effort */

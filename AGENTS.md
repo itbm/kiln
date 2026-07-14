@@ -22,10 +22,12 @@ npm run dev                    # dev server (has /api/ollama proxy)
 npm run build                  # type-check (tsc -b) + production build — must pass
 npm run preview                # serve dist/ on :4173 (needed by the two scripts below)
 node scripts/e2e-mock.mjs      # end-to-end suite against a mocked provider — must pass
+node scripts/e2e-agent.mjs     # Code tab suite against a mocked agent runner — must pass
 node scripts/verify-fresh.mjs  # first-run + key-gated live model fetch checks
 npm run shots                  # regenerate the screenshot set into shots/
 npm run icons                  # regenerate PWA icons from public/icons/icon.svg
 npm run splash                 # regenerate iOS launch images + their index.html tags
+(cd agentd && npm test)        # agent runner: tsc build + node:test suite — must pass if agentd/ changed
 ```
 
 Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
@@ -77,3 +79,15 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
 - `deploy/nginx.conf` + `Dockerfile` + `compose.yaml` — hardened
   runtime: read-only fs, tmpfs /tmp only, no access logs, no proxy
   buffering to disk, cookies stripped on the relay.
+- **Agent sessions (Code tab)**: `agentd/` is the optional companion
+  runner (Node 22 + Fastify; own package.json, tests via `npm test`) that
+  runs coding tasks in Docker-Sandboxes microVMs and opens PRs — see
+  `agentd/README.md` for the architecture. Client side:
+  `src/lib/agent/` (runner API client + event folding into IndexedDB),
+  `src/pages/CodePage.tsx`, `src/components/agent/`, settings fields in
+  `src/stores/settings.ts` (`agent*`). Wire shapes are hand-mirrored
+  between `agentd/src/types.ts` and `src/lib/agent/types.ts` — keep them
+  in sync. The sandbox template image is `agentd/sandbox/Dockerfile`;
+  the pinned Agent SDK + the shim (`agent-shim.mjs`) are the adaptation
+  point if the SDK surface drifts. nginx relays `/agent/` to agentd
+  (compose profile `agent`, off by default).

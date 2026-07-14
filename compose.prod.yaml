@@ -22,3 +22,37 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  # ---- optional agent runner (Code tab) ------------------------------
+  # Built locally (no published image yet); everything else matches
+  # compose.yaml — see agentd/README.md for host setup.
+  agentd:
+    build: ./agentd
+    container_name: kiln-agentd
+    profiles: ["agent"]
+    restart: unless-stopped
+    user: "${KILN_UID:-1000}:${KILN_GID:-1000}"
+    environment:
+      KILN_AGENT_TOKEN: ${KILN_AGENT_TOKEN:?set a high-entropy runner token}
+      SBX_SOCKET: /run/sandboxd/sandboxd.sock
+      WORKSPACE_ROOT: /var/kiln-agent
+      JOURNAL_PATH: /var/lib/agentd/journal.jsonl
+      MAX_SESSIONS: "3"
+    volumes:
+      - ${SANDBOXD_DIR:-~/.local/state/sandboxes/sandboxes/sandboxd}:/run/sandboxd
+      - type: bind
+        source: /var/kiln-agent
+        target: /var/kiln-agent
+      - agentd-journal:/var/lib/agentd
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+
+volumes:
+  agentd-journal:

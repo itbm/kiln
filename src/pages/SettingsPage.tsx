@@ -6,6 +6,7 @@ import {
   BellIcon,
   CheckIcon,
   ChevronRightIcon,
+  CopyIcon,
   DatabaseIcon,
   EyeIcon,
   EyeOffIcon,
@@ -18,6 +19,7 @@ import {
   PlusIcon,
   ServerIcon,
   SparklesIcon,
+  SquareTerminalIcon,
   SunIcon,
   Trash2Icon,
   UserIcon,
@@ -38,6 +40,7 @@ import {
 import { ModelPicker } from "@/components/chat/ModelPicker"
 import { LicensesDialog } from "@/components/LicensesDialog"
 import { db } from "@/lib/db"
+import { generateJournalKey, runnerHealth } from "@/lib/agent/client"
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts"
 import { checkOpenRouterKey } from "@/lib/providers/openrouter"
 import { checkOllamaKey } from "@/lib/providers/ollama"
@@ -315,6 +318,104 @@ function ToggleRow({
 // No sync backend exists yet; the section stays hidden so it can't confuse.
 const SHOW_SERVER_SECTION = false
 
+/** Settings → Agent runner (§5.6): connection + per-session credentials. */
+function AgentRunnerSection() {
+  const s = useSettings()
+  const [health, setHealth] = useState<string | null>(null)
+  const checkHealth = async (): Promise<string> => {
+    const h = await runnerHealth()
+    const bits = [
+      h.driver.ok ? `driver ${h.driver.driver} ok` : `driver: ${h.driver.detail ?? "down"}`,
+      h.driver.apiVersionOk === false
+        ? `sbx api ${h.driver.apiVersion} (drift!)`
+        : h.driver.apiVersion
+          ? `sbx api ${h.driver.apiVersion}`
+          : null,
+      h.driver.kvm === false ? "KVM: unavailable" : null,
+      h.driver.templatePresent === false ? "template image missing" : null,
+      `${h.sessions.live}/${h.sessions.max} sessions`,
+    ].filter(Boolean)
+    const text = bits.join(" · ")
+    setHealth(text)
+    if (!h.ok) throw new Error(text)
+    return text
+  }
+
+  return (
+    <Section
+      id="agent"
+      icon={<SquareTerminalIcon className="size-4.5" />}
+      title="Agent runner"
+      description="Optional self-hosted runner for the Code tab. Keys never leave this device except to your runner, per task — nothing readable persists on the server."
+    >
+      <div className="space-y-1.5">
+        <Label className="text-[13px]">Runner URL</Label>
+        <Input
+          value={s.agentRunnerUrl}
+          onChange={(e) => s.set({ agentRunnerUrl: e.target.value.trim() })}
+          placeholder="/agent (same origin, default)"
+          className="font-mono text-[16px] md:text-[13px]"
+        />
+      </div>
+      <KeyInput
+        label="Runner token"
+        value={s.agentRunnerToken}
+        onChange={(v) => s.set({ agentRunnerToken: v })}
+        placeholder="KILN_AGENT_TOKEN from your server"
+        onVerify={checkHealth}
+      />
+      {health && <p className="text-[12px] text-muted-foreground">{health}</p>}
+      <KeyInput
+        label="GitHub token (fine-grained PAT)"
+        value={s.agentGithubToken}
+        onChange={(v) => s.set({ agentGithubToken: v })}
+        placeholder="github_pat_…"
+      />
+      <p className="text-[12px] leading-snug text-muted-foreground">
+        Grant the PAT access to selected repositories only, with{" "}
+        <span className="font-mono">Contents</span> and{" "}
+        <span className="font-mono">Pull requests</span> read/write. It is sent per task, held in
+        runner memory and scrubbed at teardown. Protect <span className="font-mono">main</span>{" "}
+        with branch protection — agent changes only land via pull requests on{" "}
+        <span className="font-mono">kiln/*</span> branches.
+      </p>
+      <div className="space-y-1.5">
+        <Label className="text-[13px]">Journal key</Label>
+        <div className="flex gap-2">
+          <Input
+            readOnly
+            type="password"
+            value={s.agentJournalKey}
+            placeholder="not generated yet"
+            className="flex-1 font-mono text-[16px] md:text-[13px]"
+          />
+          {s.agentJournalKey ? (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Copy journal key"
+              onClick={() => {
+                void navigator.clipboard.writeText(s.agentJournalKey)
+                toast.success("Journal key copied")
+              }}
+            >
+              <CopyIcon />
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => s.set({ agentJournalKey: generateJournalKey() })}>
+              Generate
+            </Button>
+          )}
+        </div>
+        <p className="text-[12px] leading-snug text-muted-foreground">
+          Encrypts the runner&apos;s tiny session journal so the server itself can&apos;t read it.
+          Only this device holds the key; losing it only costs post-restart session recovery.
+        </p>
+      </div>
+    </Section>
+  )
+}
+
 function SavedIndicator() {
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle")
   useEffect(() => {
@@ -359,6 +460,12 @@ export default function SettingsPage() {
   })
   const importRef = useRef<HTMLInputElement>(null)
   const promptDirty = s.systemPrompt !== null
+
+  // deep links like /settings#agent scroll to their section
+  useEffect(() => {
+    const id = window.location.hash.slice(1)
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "start" })
+  }, [])
 
   return (
     <div className="mx-auto flex h-[var(--app-height)] max-w-2xl flex-col">
@@ -659,6 +766,8 @@ export default function SettingsPage() {
             iOS pauses a backgrounded tab — reopen the chat and tap “Continue generating”.
           </p>
         </Section>
+
+        <AgentRunnerSection />
 
         {/* Hidden until a sync backend actually exists — flip SHOW_SERVER_SECTION
             to bring it back. The plumbing (lib/sync.ts, "Send to server" menu

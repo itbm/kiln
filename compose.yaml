@@ -17,3 +17,47 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  # ---- optional agent runner (Code tab) ------------------------------
+  # Off by default; start with `docker compose --profile agent up -d`.
+  # Host prerequisites (KVM, docker-sbx/sandboxd, template image) and the
+  # container subtleties below are documented in agentd/README.md:
+  #  * the workspace root must be bind-mounted IDENTICALLY on host and
+  #    container (sandboxd resolves host paths) and should be tmpfs-backed
+  #    on the host so nothing readable persists;
+  #  * mount the sandboxd socket's DIRECTORY, not the socket file — a file
+  #    bind pins the inode and goes stale when sandboxd restarts;
+  #  * run as the host user that owns the socket (KILN_UID/KILN_GID).
+  agentd:
+    build: ./agentd
+    container_name: kiln-agentd
+    profiles: ["agent"]
+    restart: unless-stopped
+    user: "${KILN_UID:-1000}:${KILN_GID:-1000}"
+    environment:
+      KILN_AGENT_TOKEN: ${KILN_AGENT_TOKEN:?set a high-entropy runner token}
+      SBX_SOCKET: /run/sandboxd/sandboxd.sock
+      WORKSPACE_ROOT: /var/kiln-agent
+      JOURNAL_PATH: /var/lib/agentd/journal.jsonl
+      MAX_SESSIONS: "3"
+    volumes:
+      - ${SANDBOXD_DIR:-~/.local/state/sandboxes/sandboxes/sandboxd}:/run/sandboxd
+      - type: bind
+        source: /var/kiln-agent
+        target: /var/kiln-agent
+      # the encrypted session journal (§5.7) — the only writable persistence
+      - agentd-journal:/var/lib/agentd
+
+    # ---- hardening (same posture as kiln) ----
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0 # no core dumps — secrets live in RAM (§8.1 T6)
+
+volumes:
+  agentd-journal:

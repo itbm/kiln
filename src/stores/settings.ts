@@ -39,6 +39,22 @@ interface SettingsState {
   syncUrl: string
   syncToken: string
 
+  /** ---- agent runner (Code tab) — all optional, empty = feature off ---- */
+  /** runner base URL; "" = same origin at /agent (the bundled nginx relay) */
+  agentRunnerUrl: string
+  agentRunnerToken: string
+  /** fine-grained GitHub PAT sent per session, never stored server-side */
+  agentGithubToken: string
+  /** 256-bit hex key for the runner's encrypted session journal (§5.7) */
+  agentJournalKey: string
+  lastAgentModel: ModelRef | null
+  lastAgentRepo: string
+  lastAgentBaseBranch: string
+  agentPermissionMode: "bypassPermissions" | "acceptEdits" | "plan"
+  agentNetworkPolicy: "allow-all" | "balanced" | "deny-all"
+  agentAllowPackageManagers: boolean
+  agentExtraHosts: string
+
   set: (patch: Partial<SettingsState>) => void
   addSkill: (s: Omit<Skill, "id">) => void
   updateSkill: (id: string, patch: Partial<Skill>) => void
@@ -70,6 +86,18 @@ export const useSettings = create<SettingsState>()(
       webFetchEnabled: true,
       syncUrl: "",
       syncToken: "",
+
+      agentRunnerUrl: "",
+      agentRunnerToken: "",
+      agentGithubToken: "",
+      agentJournalKey: "",
+      lastAgentModel: null,
+      lastAgentRepo: "",
+      lastAgentBaseBranch: "main",
+      agentPermissionMode: "bypassPermissions",
+      agentNetworkPolicy: "deny-all",
+      agentAllowPackageManagers: true,
+      agentExtraHosts: "",
 
       set: (patch) => set(patch),
       addSkill: (s) =>

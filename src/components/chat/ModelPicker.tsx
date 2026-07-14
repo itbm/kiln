@@ -114,12 +114,15 @@ export function ModelPicker({
   value,
   onSelect,
   imageOnly = false,
+  toolsOnly = false,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   value: ModelRef | null
   onSelect: (ref: ModelRef, info: ModelInfo) => void
   imageOnly?: boolean
+  /** agent sessions need tool calling; hides models that report tools:false */
+  toolsOnly?: boolean
 }) {
   const { openrouter, ollama, loading, errors, fetchedAt, refresh } = useModels()
   const hasOllamaKey = useSettings((s) => !!s.ollamaKey)
@@ -132,8 +135,11 @@ export function ModelPicker({
     if (open) void refresh()
   }, [open, refresh])
 
-  const filter = (list: ModelInfo[]) =>
-    imageOnly ? list.filter((m) => m.imageOutput) : list
+  const filter = (list: ModelInfo[]) => {
+    if (imageOnly) return list.filter((m) => m.imageOutput)
+    if (toolsOnly) return list.filter((m) => m.tools !== false)
+    return list
+  }
 
   const favModels = filter([...ollama, ...openrouter]).filter((m) =>
     favorites.includes(modelKey(m)),

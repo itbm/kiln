@@ -33,7 +33,43 @@ export interface ModelInfo {
   pricing?: { prompt?: number; completion?: number }
 }
 
-export type ChatKind = "chat" | "image"
+export type ChatKind = "chat" | "image" | "agent"
+
+/** Runner session lifecycle, mirrored from kiln-agentd. */
+export type AgentSessionStatus =
+  | "created"
+  | "provisioning"
+  | "cloning"
+  | "running"
+  | "finalising"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "interrupted"
+  | "expired"
+
+export const AGENT_TERMINAL_STATES: ReadonlySet<AgentSessionStatus> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+  "expired",
+])
+
+/** Per-chat link to a runner session (kind:"agent" chats only). */
+export interface AgentMeta {
+  /** current (latest) runner session id — capability handle */
+  runnerSessionId: string
+  repo: string // owner/name
+  baseBranch: string
+  taskBranch: string
+  status: AgentSessionStatus
+  prUrl?: string
+  /** last event seq folded into IndexedDB; reconnects replay ?after=lastSeq */
+  lastSeq: number
+  /** continue/retry lineage, for display */
+  attempt?: number
+}
 
 export interface Chat {
   id: string
@@ -52,6 +88,8 @@ export interface Chat {
   /** compaction: summary of messages with createdAt <= summaryCutoff */
   summary?: string
   summaryCutoff?: number
+  /** runner session state (kind:"agent" only) */
+  agentMeta?: AgentMeta
 }
 
 export type AttachmentKind = "image" | "text" | "pdf"
@@ -87,6 +125,13 @@ export type MessageStatus =
   | "interrupted"
   | "error"
 
+/** Diff/PR/result cards attached to an agent run's assistant message. */
+export interface AgentRunExtras {
+  diff?: { stat: string; patch?: string; truncated?: boolean }
+  prUrl?: string
+  result?: { durationMs?: number; costUsd?: number; turns?: number; isError?: boolean }
+}
+
 export interface Message {
   id: string
   chatId: string
@@ -95,6 +140,8 @@ export interface Message {
   reasoning?: string
   reasoningMs?: number
   steps?: ToolStep[]
+  /** agent-session artefacts (kind:"agent" chats only) */
+  agent?: AgentRunExtras
   attachments?: Attachment[]
   images?: GenImage[]
   provider?: ProviderId

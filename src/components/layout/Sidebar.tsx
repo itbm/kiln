@@ -12,6 +12,7 @@ import {
   SearchIcon,
   SettingsIcon,
   SquarePenIcon,
+  SquareTerminalIcon,
   SunIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -193,8 +194,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
+    // agent sessions live in the Code tab, not the chat list
     const filtered = (chats ?? []).filter(
-      (c) => c.title.toLowerCase().includes(q) || contentHits?.has(c.id),
+      (c) =>
+        c.kind !== "agent" &&
+        (c.title.toLowerCase().includes(q) || contentHits?.has(c.id)),
     )
     const out: { label: string; chats: Chat[] }[] = []
     for (const c of filtered) {
@@ -223,6 +227,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           [
             { path: "/", label: "New chat", icon: SquarePenIcon, exact: true },
             { path: "/images", label: "Images", icon: ImageIcon, exact: false },
+            { path: "/code", label: "Code", icon: SquareTerminalIcon, exact: false },
             { path: "/artefacts", label: "Artefacts", icon: AmphoraIcon, exact: false },
           ] as const
         ).map((item) => {

@@ -12,6 +12,12 @@ class KilnDB extends Dexie {
       chats: "id, updatedAt, kind",
       messages: "id, chatId, createdAt",
     })
+    // v2 (agent sessions): compound index so the Code tab can list
+    // kind:"agent" chats by recency without scanning. Purely additive.
+    this.version(2).stores({
+      chats: "id, updatedAt, kind, [kind+updatedAt]",
+      messages: "id, chatId, createdAt",
+    })
   }
 }
 

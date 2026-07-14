@@ -102,6 +102,15 @@ data — regenerate any time with `npm run shots`.
   arrives; if the OS kills the tab mid-answer you keep everything received
   so far, marked "interrupted", with a one-tap **Continue generating**.
   An optional wake lock keeps the screen on during long generations.
+- **Agent sessions (optional)** — a **Code** tab backed by a self-hosted
+  companion runner (`kiln-agentd`): describe a change to one of your GitHub
+  repositories and a coding agent (Claude Agent SDK, pointed at *your*
+  OpenRouter/Ollama key) does the work in a disposable Docker-Sandboxes
+  microVM and opens a pull request on a `kiln/*` branch. Live tool-step
+  timeline, mid-task steering, diff + PR cards, per-session network policy,
+  and Continue/Retry that reseed a fresh sandbox from the task branch.
+  Credentials transit per session and are held only in runner memory; the
+  phone stays the only transcript store. See `agentd/README.md`.
 - **Server hand-off (optional)** — "Send to server" POSTs a chat as JSON to
   a URL you configure, ready for a future sync backend.
 

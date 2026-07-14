@@ -83,6 +83,9 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/ollama/, ""),
       },
+      // Agent runner (kiln-agentd) during development — nginx relays the
+      // same path in production. ws:true carries the event stream.
+      "/agent": { target: "http://localhost:9090", ws: true },
     },
   },
   preview: {
@@ -92,6 +95,7 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/ollama/, ""),
       },
+      "/agent": { target: "http://localhost:9090", ws: true },
     },
   },
 })
