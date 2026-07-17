@@ -158,21 +158,32 @@ export function elSpots(env: AnchorEnv): Spot[] {
     )
   } else if (sheets.length) {
     const sheet = sheets[sheets.length - 1]
-    add(
-      "sheet",
-      sheet,
-      (r) =>
-        r.top < 80
-          ? { x: r.right - S * 2.4, y: r.top + S * 0.95, s: 0.55 }
-          : { x: r.right - S * 1.2, y: r.top - S * 0.42, s: 0.7 },
-      { w: 3, home: true, peek: true },
-    )
-    add(
-      "menu",
-      q('[data-pip-spot="menu"]'),
-      (r) => ({ x: r.right + S * 0.9, y: r.cy - S * 0.12, s: 0.55 }),
-      { w: 1, peek: true },
-    )
+    const sheetR = rectOfEl(sheet)
+    const tall = !!sheetR && sheetR.top < 80
+    if (tall) {
+      /* near-fullscreen sheet (artefact viewer, model picker): its header
+         is packed with controls, so perch on the footer bar instead */
+      add(
+        "sheet",
+        sheet.querySelector('[data-pip-spot="sheet-foot"]'),
+        (r) => ({ x: r.right - S * 1.05, y: r.top - S * 0.5, s: 0.62 }),
+        { w: 3, home: true, peek: true },
+      )
+    } else {
+      add(
+        "sheet",
+        sheet,
+        (r) => ({ x: r.right - S * 1.2, y: r.top - S * 0.42, s: 0.7 }),
+        { w: 3, home: true, peek: true },
+      )
+      /* header peek only while the sheet leaves the header uncovered */
+      add(
+        "menu",
+        q('[data-pip-spot="menu"]'),
+        (r) => ({ x: r.right + S * 0.9, y: r.cy - S * 0.12, s: 0.55 }),
+        { w: 1, peek: true },
+      )
+    }
   } else if (dialog) {
     add(
       "dialog",

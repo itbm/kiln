@@ -11,16 +11,32 @@ Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
 
 ## Screenshots
 
-Shown with Ollama cloud models (GLM-5.2, gpt-oss and friends). Seeded demo
-data — regenerate any time with `npm run shots`.
+Shown with Ollama cloud models (GLM-5.2, gpt-oss and friends) and seeded
+demo data — regenerate any time with `npm run shots -- docs/screenshots`.
 
-| New chat | Chat | Reasoning | Model picker |
-| :---: | :---: | :---: | :---: |
-| ![New chat](docs/screenshots/new-chat.png) | ![Streaming markdown chat](docs/screenshots/chat.png) | ![Thinking trace](docs/screenshots/reasoning.png) | ![Model picker](docs/screenshots/model-picker.png) |
+**Ember · dark** — the default theme, with Pip the stuntflame
 
-| Artefacts | Questions | Sidebar | Dark mode |
+| New chat | Chat | Artefact viewer | Model picker |
 | :---: | :---: | :---: | :---: |
-| ![Artifact viewer](docs/screenshots/artifact.png) | ![Interactive questions](docs/screenshots/questions.png) | ![Sidebar](docs/screenshots/sidebar.png) | ![Dark mode](docs/screenshots/chat-dark.png) |
+| ![Ember dark — new chat](docs/screenshots/ember-dark-new-chat.png) | ![Ember dark — chat](docs/screenshots/ember-dark-chat.png) | ![Ember dark — artefact viewer](docs/screenshots/ember-dark-artefact.png) | ![Ember dark — model picker](docs/screenshots/ember-dark-model-picker.png) |
+
+**Ember · light**
+
+| New chat | Chat | Artefact viewer | Model picker |
+| :---: | :---: | :---: | :---: |
+| ![Ember light — new chat](docs/screenshots/ember-light-new-chat.png) | ![Ember light — chat](docs/screenshots/ember-light-chat.png) | ![Ember light — artefact viewer](docs/screenshots/ember-light-artefact.png) | ![Ember light — model picker](docs/screenshots/ember-light-model-picker.png) |
+
+**Classic · dark** — the original look, one tap away in Settings → Appearance
+
+| New chat | Chat | Artefact viewer | Model picker |
+| :---: | :---: | :---: | :---: |
+| ![Classic dark — new chat](docs/screenshots/classic-dark-new-chat.png) | ![Classic dark — chat](docs/screenshots/classic-dark-chat.png) | ![Classic dark — artefact viewer](docs/screenshots/classic-dark-artefact.png) | ![Classic dark — model picker](docs/screenshots/classic-dark-model-picker.png) |
+
+**Classic · light**
+
+| New chat | Chat | Artefact viewer | Model picker |
+| :---: | :---: | :---: | :---: |
+| ![Classic light — new chat](docs/screenshots/classic-light-new-chat.png) | ![Classic light — chat](docs/screenshots/classic-light-chat.png) | ![Classic light — artefact viewer](docs/screenshots/classic-light-artefact.png) | ![Classic light — model picker](docs/screenshots/classic-light-model-picker.png) |
 
 ## Features
 

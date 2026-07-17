@@ -227,38 +227,97 @@ Want me to turn this into a printable itinerary with opening hours and walking d
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ember &amp; Oak</title>
 <style>
-  :root{--bg:#faf6f0;--ink:#2b211a;--ember:#c96442;--oak:#8a5a3b}
+  :root{--roast:#241811;--roast-2:#3c2718;--crema:#f7efe2;--paper:#faf4ea;
+    --ink:#33261c;--soft:#8a715c;--ember:#d4622e;--ember-2:#e89a5d;--line:#e7dac6}
   *{margin:0;box-sizing:border-box}
-  body{font-family:Georgia,serif;background:var(--bg);color:var(--ink)}
-  header{padding:12vh 8vw;background:linear-gradient(160deg,#f3e3d3,#e8c9ae)}
-  h1{font-size:clamp(2.4rem,7vw,4rem)}
-  .tag{font-style:italic;color:var(--oak);margin-top:.6rem}
-  .cta{display:inline-block;margin-top:1.6rem;background:var(--ember);color:#fff;
-       padding:.8rem 1.6rem;border-radius:999px;text-decoration:none}
-  section{padding:9vh 8vw}
-  .menu{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  .card{background:#fff;border-radius:18px;padding:1.2rem;box-shadow:0 4px 14px #0001}
-  .price{float:right;color:var(--ember)}
-  footer{padding:6vh 8vw;background:var(--ink);color:#f5ead9}
+  body{background:var(--paper);color:var(--ink);line-height:1.65;
+    font-family:"Iowan Old Style",Georgia,"Times New Roman",serif}
+  .wrap{max-width:620px;margin:0 auto;padding:0 24px}
+  .eyebrow{font-family:Avenir,Futura,"Gill Sans",sans-serif;font-size:11px;
+    font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:var(--ember)}
+  header{position:relative;text-align:center;padding:64px 24px 58px;color:var(--crema);
+    background:radial-gradient(130% 90% at 85% -15%,var(--roast-2),transparent 60%),
+      radial-gradient(110% 130% at -15% 115%,#31200f,transparent 55%),var(--roast)}
+  header .eyebrow{color:var(--ember-2)}
+  .latte{width:86px;height:86px;margin:0 auto 22px;border-radius:50%;
+    background:radial-gradient(circle at 50% 44%,#f2dbb6 0 15%,#c98a4b 21% 30%,
+      #7c4d27 36% 46%,#4a2e1a 52% 100%);
+    box-shadow:0 0 0 7px #171009,0 0 0 9px #5d4530,0 18px 34px -14px rgba(0,0,0,.8)}
+  h1{font-size:clamp(2.6rem,12vw,3.8rem);font-weight:600;line-height:1.04;margin:14px 0 10px}
+  h1 .amp{font-style:italic;color:var(--ember-2)}
+  .tag{font-style:italic;color:#cdb69c}
+  .cta{display:inline-block;margin-top:26px;padding:13px 32px;border-radius:999px;
+    background:linear-gradient(120deg,var(--ember),var(--ember-2));color:#241207;
+    font-family:Avenir,Futura,sans-serif;font-weight:700;font-size:14px;
+    letter-spacing:.04em;text-decoration:none;
+    box-shadow:0 12px 30px -10px rgba(212,98,46,.6)}
+  .creds{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:30px}
+  .creds span{font-family:Avenir,Futura,sans-serif;font-size:11.5px;letter-spacing:.05em;
+    color:#d9c3a8;border:1px solid rgba(247,239,226,.25);border-radius:999px;padding:5px 13px}
+  section{padding:54px 0 8px}
+  h2{font-size:1.7rem;font-weight:600;margin:6px 0 26px}
+  .menu{list-style:none;display:grid;gap:22px}
+  .row{display:flex;align-items:baseline;gap:10px}
+  .row h3{font-size:1.08rem;font-weight:600;white-space:nowrap}
+  .dots{flex:1;border-bottom:2px dotted #d3bfa2;transform:translateY(-5px)}
+  .price{font-family:Avenir,Futura,sans-serif;font-weight:700;color:var(--ember)}
+  .menu p{color:var(--soft);font-size:.95rem;margin-top:3px}
+  .special{margin:40px 0 0;padding:22px 24px;border-radius:20px;color:var(--crema);
+    background:linear-gradient(135deg,var(--roast-2),var(--roast));
+    box-shadow:0 16px 34px -18px rgba(36,24,17,.55)}
+  .special .eyebrow{color:var(--ember-2)}
+  .special p{color:#d9c3a8;margin-top:6px}
+  .hours{padding:52px 0 56px}
+  .hours dl{border-top:1px solid var(--line)}
+  .hours div{display:flex;justify-content:space-between;gap:12px;
+    padding:13px 2px;border-bottom:1px solid var(--line)}
+  .hours dd{font-family:Avenir,Futura,sans-serif;font-size:.95rem;color:var(--soft)}
+  .note{margin-top:18px;font-style:italic;color:var(--soft)}
+  footer{background:var(--roast);color:#cdb69c;text-align:center;padding:34px 24px}
+  footer b{color:var(--crema);font-weight:600}
 </style>
 </head>
 <body>
 <header>
-  <h1>Ember &amp; Oak</h1>
+  <div class="latte" aria-hidden="true"></div>
+  <p class="eyebrow">Roastery &middot; Bakery &middot; Corner room</p>
+  <h1>Ember <span class="amp">&amp;</span> Oak</h1>
   <p class="tag">Slow-roasted coffee, baked mornings, warm rooms.</p>
   <a class="cta" href="#menu">See the menu</a>
+  <div class="creds">
+    <span>Roasted in-house</span><span>Oat by default</span><span>Dogs welcome</span>
+  </div>
 </header>
-<section id="menu">
-  <h2>House favourites</h2><br>
-  <div class="menu">
-    <div class="card"><h3>Flat White <span class="price">£3.6</span></h3><p>Velvety double ristretto, oat by default.</p></div>
-    <div class="card"><h3>Maple Cardamom Bun <span class="price">£4.2</span></h3><p>Baked 7am &amp; 11am, gone by noon.</p></div>
-    <div class="card"><h3>Pour-over — Huila <span class="price">£4.8</span></h3><p>Washed Colombian, stone fruit &amp; honey.</p></div>
+<section id="menu" class="wrap">
+  <p class="eyebrow">House favourites</p>
+  <h2>From the bar &amp; the oven</h2>
+  <ul class="menu">
+    <li><div class="row"><h3>Flat white</h3><i class="dots"></i><b class="price">£3.60</b></div>
+      <p>Velvety double ristretto over silky oat.</p></li>
+    <li><div class="row"><h3>Pour-over &mdash; Huila</h3><i class="dots"></i><b class="price">£4.80</b></div>
+      <p>Washed Colombian; stone fruit, honey, long finish.</p></li>
+    <li><div class="row"><h3>Maple cardamom bun</h3><i class="dots"></i><b class="price">£4.20</b></div>
+      <p>Baked 7am &amp; 11am &mdash; reliably gone by noon.</p></li>
+  </ul>
+  <div class="special">
+    <p class="eyebrow">This week&rsquo;s roast</p>
+    <p><b>Yirgacheffe &mdash; natural process.</b> Blueberry jam on the nose,
+    roasted every Tuesday while the whole street watches the chimney.</p>
   </div>
 </section>
+<section class="hours wrap">
+  <p class="eyebrow">Opening hours</p>
+  <h2>When the kettle&rsquo;s on</h2>
+  <dl>
+    <div><dt>Monday &ndash; Friday</dt><dd>7:00 &ndash; 17:00</dd></div>
+    <div><dt>Saturday</dt><dd>8:00 &ndash; 18:00</dd></div>
+    <div><dt>Sunday</dt><dd>8:00 &ndash; 16:00</dd></div>
+  </dl>
+  <p class="note">First pour is on us if the 7:03 bus beats the espresso machine warming up.</p>
+</section>
 <footer>
-  <h3>Find us</h3>
-  <p>14 Alder Lane · Mon–Fri 7–17 · Sat–Sun 8–18</p>
+  <p><b>Ember &amp; Oak</b> &middot; 14 Alder Lane</p>
+  <p>hello@emberandoak.example</p>
 </footer>
 </body>
 </html>

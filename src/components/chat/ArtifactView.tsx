@@ -176,7 +176,10 @@ export function ArtifactViewer({
           )}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-border px-3 pt-2 pb-safe-plus">
+        <div
+          className="flex items-center gap-2 border-t border-border px-3 pt-2 pb-safe-plus"
+          data-pip-spot="sheet-foot"
+        >
           <Button
             variant="outline"
             size="sm"
