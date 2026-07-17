@@ -201,10 +201,10 @@ Want me to turn this into a printable itinerary with opening hours and walking d
     ],
   )
 
-  const coffee = mk(
+  const paas = mk(
     {
-      id: "demo-coffee",
-      title: "Coffee shop landing page",
+      id: "demo-strata",
+      title: "PaaS landing page",
       updatedAt: now - 3 * H,
       createdAt: now - 3.4 * H,
     },
@@ -212,118 +212,142 @@ Want me to turn this into a printable itinerary with opening hours and walking d
       {
         role: "user",
         content:
-          "Make me a simple landing page for my coffee shop “Ember & Oak” — warm colours, hero section, menu highlights, opening hours. Just one file.",
+          "Landing page for my cloud platform “Strata” — near-black, one sharp red accent, big confident type, a deploy terminal in the hero, numbered feature grid. One file, no external assets.",
       },
       {
         role: "assistant",
         modelName: "glm-5.2",
-        content: `Here's a self-contained landing page with a warm palette and everything inline:
+        content: `Dark canvas, one loud red, and the terminal doing the selling — everything inline:
 
-<artifact identifier="ember-oak-landing" type="text/html" title="Ember & Oak — Landing page">
+<artifact identifier="strata-landing" type="text/html" title="Strata — Landing page">
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ember &amp; Oak</title>
+<title>Strata &mdash; ship on your terms</title>
 <style>
-  :root{--roast:#241811;--roast-2:#3c2718;--crema:#f7efe2;--paper:#faf4ea;
-    --ink:#33261c;--soft:#8a715c;--ember:#d4622e;--ember-2:#e89a5d;--line:#e7dac6}
+  :root{--bg:#0a0a0c;--card:#101014;--ink:#ededf0;--mut:#8f8f99;--line:#ffffff14;
+    --red:#ff2d20;--red-2:#ff7433;--green:#3fdf8f;--amber:#ffd166;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
   *{margin:0;box-sizing:border-box}
-  body{background:var(--paper);color:var(--ink);line-height:1.65;
-    font-family:"Iowan Old Style",Georgia,"Times New Roman",serif}
-  .wrap{max-width:620px;margin:0 auto;padding:0 24px}
-  .eyebrow{font-family:Avenir,Futura,"Gill Sans",sans-serif;font-size:11px;
-    font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:var(--ember)}
-  header{position:relative;text-align:center;padding:64px 24px 58px;color:var(--crema);
-    background:radial-gradient(130% 90% at 85% -15%,var(--roast-2),transparent 60%),
-      radial-gradient(110% 130% at -15% 115%,#31200f,transparent 55%),var(--roast)}
-  header .eyebrow{color:var(--ember-2)}
-  .latte{width:86px;height:86px;margin:0 auto 22px;border-radius:50%;
-    background:radial-gradient(circle at 50% 44%,#f2dbb6 0 15%,#c98a4b 21% 30%,
-      #7c4d27 36% 46%,#4a2e1a 52% 100%);
-    box-shadow:0 0 0 7px #171009,0 0 0 9px #5d4530,0 18px 34px -14px rgba(0,0,0,.8)}
-  h1{font-size:clamp(2.6rem,12vw,3.8rem);font-weight:600;line-height:1.04;margin:14px 0 10px}
-  h1 .amp{font-style:italic;color:var(--ember-2)}
-  .tag{font-style:italic;color:#cdb69c}
-  .cta{display:inline-block;margin-top:26px;padding:13px 32px;border-radius:999px;
-    background:linear-gradient(120deg,var(--ember),var(--ember-2));color:#241207;
-    font-family:Avenir,Futura,sans-serif;font-weight:700;font-size:14px;
-    letter-spacing:.04em;text-decoration:none;
-    box-shadow:0 12px 30px -10px rgba(212,98,46,.6)}
-  .creds{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:30px}
-  .creds span{font-family:Avenir,Futura,sans-serif;font-size:11.5px;letter-spacing:.05em;
-    color:#d9c3a8;border:1px solid rgba(247,239,226,.25);border-radius:999px;padding:5px 13px}
-  section{padding:54px 0 8px}
-  h2{font-size:1.7rem;font-weight:600;margin:6px 0 26px}
-  .menu{list-style:none;display:grid;gap:22px}
-  .row{display:flex;align-items:baseline;gap:10px}
-  .row h3{font-size:1.08rem;font-weight:600;white-space:nowrap}
-  .dots{flex:1;border-bottom:2px dotted #d3bfa2;transform:translateY(-5px)}
-  .price{font-family:Avenir,Futura,sans-serif;font-weight:700;color:var(--ember)}
-  .menu p{color:var(--soft);font-size:.95rem;margin-top:3px}
-  .special{margin:40px 0 0;padding:22px 24px;border-radius:20px;color:var(--crema);
-    background:linear-gradient(135deg,var(--roast-2),var(--roast));
-    box-shadow:0 16px 34px -18px rgba(36,24,17,.55)}
-  .special .eyebrow{color:var(--ember-2)}
-  .special p{color:#d9c3a8;margin-top:6px}
-  .hours{padding:52px 0 56px}
-  .hours dl{border-top:1px solid var(--line)}
-  .hours div{display:flex;justify-content:space-between;gap:12px;
-    padding:13px 2px;border-bottom:1px solid var(--line)}
-  .hours dd{font-family:Avenir,Futura,sans-serif;font-size:.95rem;color:var(--soft)}
-  .note{margin-top:18px;font-style:italic;color:var(--soft)}
-  footer{background:var(--roast);color:#cdb69c;text-align:center;padding:34px 24px}
-  footer b{color:var(--crema);font-weight:600}
+  body{background:var(--bg);color:var(--ink);line-height:1.6;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;
+    background-image:radial-gradient(85% 42% at 50% -6%,rgba(255,45,32,.17),transparent 64%)}
+  .wrap{max-width:660px;margin:0 auto;padding:0 22px}
+  a{text-decoration:none;color:inherit}
+  nav{display:flex;align-items:center;gap:16px;padding:16px 22px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;letter-spacing:-.02em}
+  .mark{width:22px;height:22px;border-radius:6px;flex:none;
+    background:conic-gradient(from 210deg,var(--red),var(--red-2),var(--red));
+    box-shadow:0 0 18px rgba(255,45,32,.55)}
+  nav a.lnk{color:var(--mut);font-size:13.5px}
+  .navcta{margin-left:auto;font-size:13px;font-weight:600;
+    border:1px solid var(--line);border-radius:999px;padding:7px 15px}
+  header{padding:44px 0 26px}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#ffb3a8;
+    border:1px solid rgba(255,45,32,.35);border-radius:999px;padding:5px 12px;
+    background:rgba(255,45,32,.08)}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  h1{font-size:clamp(2.35rem,10.5vw,3.4rem);line-height:1.05;letter-spacing:-.035em;
+    font-weight:800;margin:18px 0 14px}
+  h1 span{background:linear-gradient(100deg,var(--red),var(--red-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--mut);font-size:1.02rem;max-width:36ch}
+  .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+  .btn{font-size:14px;font-weight:700;border-radius:10px;padding:12px 22px;
+    background:var(--red);color:#fff;box-shadow:0 10px 30px -10px rgba(255,45,32,.7)}
+  .ghost{font-size:14px;font-weight:600;border-radius:10px;padding:12px 20px;
+    border:1px solid var(--line);color:var(--ink);font-family:var(--mono)}
+  .term{margin:34px 0 6px;border:1px solid var(--line);border-radius:14px;
+    background:#0d0d11;overflow:hidden;
+    box-shadow:0 40px 80px -40px rgba(255,45,32,.35),0 30px 60px -30px rgba(0,0,0,.8)}
+  .tbar{display:flex;align-items:center;gap:6px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .tbar i{width:10px;height:10px;border-radius:50%;background:#2c2c33}
+  .tbar i:first-child{background:rgba(255,45,32,.6)}
+  .tbar b{margin-left:auto;font:500 11px var(--mono);color:var(--mut)}
+  .term pre{padding:15px 16px 17px;font:12.5px/1.85 var(--mono);color:#c9c9d2;overflow-x:auto}
+  .c{color:var(--mut)}.g{color:var(--green)}.r{color:#ff8a7a}.y{color:var(--amber)}
+  section{padding:46px 0 0}
+  .eyebrow{font:700 11px var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--red-2)}
+  h2{font-size:1.65rem;letter-spacing:-.02em;line-height:1.2;font-weight:800;margin:10px 0 22px}
+  .grid{display:grid;gap:12px}
+  .card{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--card)}
+  .card b{display:block;font-size:15px;margin:10px 0 4px}
+  .card p{color:var(--mut);font-size:13.5px}
+  .num{font:700 12px var(--mono);color:var(--red)}
+  .stats{display:flex;gap:8px;margin-top:40px;text-align:center}
+  .stats div{flex:1;border:1px solid var(--line);border-radius:14px;padding:14px 6px;background:var(--card)}
+  .stats b{display:block;font-size:19px;letter-spacing:-.02em}
+  .stats span{font:500 10.5px var(--mono);color:var(--mut);letter-spacing:.06em}
+  .last{margin:52px 0 0;padding:30px 22px 34px;text-align:center;border-top:1px solid var(--line);
+    background:radial-gradient(70% 100% at 50% 115%,rgba(255,45,32,.14),transparent 70%)}
+  .last h2{margin:0 0 8px}
+  .last p{color:var(--mut);font-size:14px;margin-bottom:20px}
+  .curl{display:inline-block;margin-top:16px;font:12px var(--mono);color:var(--mut);
+    border:1px dashed #ffffff22;border-radius:8px;padding:8px 14px}
+  footer{padding:22px;text-align:center;font-size:12.5px;color:#5d5d66}
 </style>
 </head>
 <body>
-<header>
-  <div class="latte" aria-hidden="true"></div>
-  <p class="eyebrow">Roastery &middot; Bakery &middot; Corner room</p>
-  <h1>Ember <span class="amp">&amp;</span> Oak</h1>
-  <p class="tag">Slow-roasted coffee, baked mornings, warm rooms.</p>
-  <a class="cta" href="#menu">See the menu</a>
-  <div class="creds">
-    <span>Roasted in-house</span><span>Oat by default</span><span>Dogs welcome</span>
+<nav>
+  <a class="logo" href="#"><span class="mark"></span>Strata</a>
+  <a class="lnk" href="#why">Docs</a>
+  <a class="lnk" href="#why">Pricing</a>
+  <a class="navcta" href="#go">Sign in</a>
+</nav>
+<header class="wrap">
+  <p class="pill"><i></i>Now in public beta &middot; free while it lasts</p>
+  <h1>Deploy in seconds.<br><span>Scale on cue.</span></h1>
+  <p class="sub">Strata is the platform layer your side project graduates to:
+  git push, and we handle the servers, certs, queues and 3am pages.</p>
+  <div class="ctas"><a class="btn" href="#go">Start deploying</a>
+  <a class="ghost" href="#why">strata docs &rarr;</a></div>
+  <div class="term">
+    <div class="tbar"><i></i><i></i><i></i><b>~/side-project</b></div>
+    <pre><span class="c">$</span> strata deploy --prod
+<span class="c">&rsaquo;</span> build     <span class="c">........</span> done <span class="c">in</span> <span class="y">8.2s</span>
+<span class="c">&rsaquo;</span> postgres  <span class="c">........</span> migrated <span class="c">(4 new)</span>
+<span class="c">&rsaquo;</span> rollout   <span class="c">........</span> healthy <span class="c">in 9 regions</span>
+<span class="g">&check;</span> live <span class="c">at</span> <span class="r">https://app.strata.dev</span>
+  <span class="c">p99 34ms &middot; scaled to zero overnight</span></pre>
   </div>
 </header>
-<section id="menu" class="wrap">
-  <p class="eyebrow">House favourites</p>
-  <h2>From the bar &amp; the oven</h2>
-  <ul class="menu">
-    <li><div class="row"><h3>Flat white</h3><i class="dots"></i><b class="price">£3.60</b></div>
-      <p>Velvety double ristretto over silky oat.</p></li>
-    <li><div class="row"><h3>Pour-over &mdash; Huila</h3><i class="dots"></i><b class="price">£4.80</b></div>
-      <p>Washed Colombian; stone fruit, honey, long finish.</p></li>
-    <li><div class="row"><h3>Maple cardamom bun</h3><i class="dots"></i><b class="price">£4.20</b></div>
-      <p>Baked 7am &amp; 11am &mdash; reliably gone by noon.</p></li>
-  </ul>
-  <div class="special">
-    <p class="eyebrow">This week&rsquo;s roast</p>
-    <p><b>Yirgacheffe &mdash; natural process.</b> Blueberry jam on the nose,
-    roasted every Tuesday while the whole street watches the chimney.</p>
+<section id="why" class="wrap">
+  <p class="eyebrow">The platform</p>
+  <h2>Everything between<br>git push and production.</h2>
+  <div class="grid">
+    <div class="card"><span class="num">01</span>
+      <b>Zero-config deploys</b>
+      <p>Push to main. Buildpacks detect the stack, build it, and roll out behind health checks.</p></div>
+    <div class="card"><span class="num">02</span>
+      <b>Batteries: included</b>
+      <p>Postgres, Redis and object storage provisioned in one click, backed up nightly.</p></div>
+    <div class="card"><span class="num">03</span>
+      <b>A URL for every branch</b>
+      <p>Each PR gets its own preview environment with a seeded database. Merge, and it&rsquo;s gone.</p></div>
+    <div class="card"><span class="num">04</span>
+      <b>Scale to zero</b>
+      <p>Up on traffic, down to nothing at 3am. You pay for requests, not for idle.</p></div>
+  </div>
+  <div class="stats">
+    <div><b>99.99%</b><span>UPTIME</span></div>
+    <div><b>9</b><span>REGIONS</span></div>
+    <div><b>34ms</b><span>P99</span></div>
   </div>
 </section>
-<section class="hours wrap">
-  <p class="eyebrow">Opening hours</p>
-  <h2>When the kettle&rsquo;s on</h2>
-  <dl>
-    <div><dt>Monday &ndash; Friday</dt><dd>7:00 &ndash; 17:00</dd></div>
-    <div><dt>Saturday</dt><dd>8:00 &ndash; 18:00</dd></div>
-    <div><dt>Sunday</dt><dd>8:00 &ndash; 16:00</dd></div>
-  </dl>
-  <p class="note">First pour is on us if the 7:03 bus beats the espresso machine warming up.</p>
-</section>
-<footer>
-  <p><b>Ember &amp; Oak</b> &middot; 14 Alder Lane</p>
-  <p>hello@emberandoak.example</p>
-</footer>
+<div class="last" id="go">
+  <h2>Live in the next five minutes.</h2>
+  <p>No YAML. No sales call. A free Postgres you&rsquo;ll outgrow eventually.</p>
+  <a class="btn" href="#">Create your first app</a><br>
+  <span class="curl">curl -fsSL get.strata.dev | sh</span>
+</div>
+<footer>Strata &copy; 2026 &middot; status &middot; changelog &middot; @strata</footer>
 </body>
 </html>
 </artifact>
 
-The palette leans on ember-orange against oak browns. Tap the card to preview it — want a booking section or a map embed next?`,
+One red on near-black, the gradient saved for the verb, and the terminal does the actual pitch. Want a pricing table or a dark/light toggle next?`,
       },
     ],
   )
@@ -455,7 +479,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
   }
 
   await db.transaction("rw", db.chats, db.messages, async () => {
-    for (const { c, list } of [kyoto, coffee, script, quiz, images]) {
+    for (const { c, list } of [kyoto, paas, script, quiz, images]) {
       await db.chats.put(c)
       await db.messages.bulkPut(list)
     }

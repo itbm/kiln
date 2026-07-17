@@ -62,9 +62,9 @@ for (const { theme, scheme } of ROWS) {
   await page.goto(`${BASE}/chat/demo-kyoto`, { waitUntil: "networkidle" })
   await shot("chat", 1200)
 
-  // artefact viewer (Ember & Oak landing page preview)
-  await page.goto(`${BASE}/chat/demo-coffee`, { waitUntil: "networkidle" })
-  await page.getByText("Ember & Oak — Landing page").click()
+  // artefact viewer (Strata landing page preview)
+  await page.goto(`${BASE}/chat/demo-strata`, { waitUntil: "networkidle" })
+  await page.getByText("Strata — Landing page").click()
   await shot("artefact", 1600)
   await page.keyboard.press("Escape")
   await page.waitForTimeout(400)
