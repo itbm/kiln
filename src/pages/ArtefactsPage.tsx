@@ -107,11 +107,16 @@ export default function ArtefactsPage() {
                 className="w-full bg-transparent text-[16px] outline-none placeholder:text-muted-foreground/70 md:text-[13.5px]"
               />
             </div>
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+            <div
+              className="flex gap-1.5 overflow-x-auto scrollbar-none"
+              data-pip-spot="filters"
+            >
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
+                  data-ui="chip"
+                  data-active={filter === f.key ? "true" : undefined}
                   className={cn(
                     "shrink-0 rounded-full border px-3 py-1 text-[12.5px] font-medium transition-colors",
                     filter === f.key
@@ -147,6 +152,7 @@ export default function ArtefactsPage() {
                   return (
                     <div
                       key={key}
+                      data-ui="art-card"
                       className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition hover:border-primary/40"
                     >
                       <button
@@ -158,7 +164,10 @@ export default function ArtefactsPage() {
                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         {e.kind === "artifact" && Icon ? (
-                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <div
+                            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+                            data-ui="art-ico"
+                          >
                             <Icon className="size-5" />
                           </div>
                         ) : e.kind === "image" ? (

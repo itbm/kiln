@@ -95,6 +95,8 @@ function ChatRow({
 
   return (
     <div
+      data-ui="chat-row"
+      data-active={active ? "true" : undefined}
       className={cn(
         "group flex items-center rounded-xl transition-colors",
         active ? "bg-accent" : "hover:bg-accent/60",
@@ -211,9 +213,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="flex items-center justify-between px-4 pb-1 pt-safe">
         <button
           onClick={() => go("/")}
+          data-ui="sb-brand"
           className="flex items-center gap-2 pt-3 font-serif text-[22px] font-semibold tracking-tight"
         >
-          <img src="/icons/icon.svg" alt="" className="size-6 rounded-md" />
+          <img
+            src="/icons/icon.svg"
+            alt=""
+            className="size-6 rounded-md"
+            data-ui="sb-logo"
+          />
+          <span aria-hidden data-ui="spyhole" />
           Kiln
         </button>
       </div>
@@ -251,7 +260,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="px-2 py-2">
-        <div className="flex items-center gap-2 rounded-xl bg-background/70 px-2.5 py-1.5 border border-border/60">
+        <div
+          className="flex items-center gap-2 rounded-xl bg-background/70 px-2.5 py-1.5 border border-border/60"
+          data-ui="sb-search"
+          data-pip-spot="sb-search"
+        >
           <SearchIcon className="size-3.5 text-muted-foreground" />
           <input
             value={query}
@@ -270,7 +283,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         ) : (
           groups.map((g) => (
             <div key={g.label} className="mb-1">
-              <div className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+              <div
+                className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80"
+                data-ui="sb-group"
+              >
                 {g.label}
               </div>
               {g.chats.map((c) => (
@@ -287,7 +303,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </div>
 
-      <div className="flex items-center gap-1 border-t border-sidebar-border px-2 pt-2 pb-safe-plus">
+      <div
+        className="flex items-center gap-1 border-t border-sidebar-border px-2 pt-2 pb-safe-plus"
+        data-pip-spot="sb-foot"
+      >
         <Button
           variant="ghost"
           size="sm"

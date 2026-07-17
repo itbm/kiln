@@ -39,6 +39,7 @@ export function ToolStepView({ step }: { step: ToolStep }) {
     <div className="my-1.5">
       <button
         onClick={() => setOpen(!open)}
+        data-ui="tool-chip"
         className={cn(
           "flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[12.5px] text-muted-foreground",
           "hover:bg-accent transition-colors",

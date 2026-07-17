@@ -201,10 +201,10 @@ Want me to turn this into a printable itinerary with opening hours and walking d
     ],
   )
 
-  const coffee = mk(
+  const paas = mk(
     {
-      id: "demo-coffee",
-      title: "Coffee shop landing page",
+      id: "demo-strata",
+      title: "PaaS landing page",
       updatedAt: now - 3 * H,
       createdAt: now - 3.4 * H,
     },
@@ -212,59 +212,142 @@ Want me to turn this into a printable itinerary with opening hours and walking d
       {
         role: "user",
         content:
-          "Make me a simple landing page for my coffee shop “Ember & Oak” — warm colours, hero section, menu highlights, opening hours. Just one file.",
+          "Landing page for my cloud platform “Strata” — near-black, one sharp red accent, big confident type, a deploy terminal in the hero, numbered feature grid. One file, no external assets.",
       },
       {
         role: "assistant",
         modelName: "glm-5.2",
-        content: `Here's a self-contained landing page with a warm palette and everything inline:
+        content: `Dark canvas, one loud red, and the terminal doing the selling — everything inline:
 
-<artifact identifier="ember-oak-landing" type="text/html" title="Ember & Oak — Landing page">
+<artifact identifier="strata-landing" type="text/html" title="Strata — Landing page">
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ember &amp; Oak</title>
+<title>Strata &mdash; ship on your terms</title>
 <style>
-  :root{--bg:#faf6f0;--ink:#2b211a;--ember:#c96442;--oak:#8a5a3b}
+  :root{--bg:#0a0a0c;--card:#101014;--ink:#ededf0;--mut:#8f8f99;--line:#ffffff14;
+    --red:#ff2d20;--red-2:#ff7433;--green:#3fdf8f;--amber:#ffd166;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
   *{margin:0;box-sizing:border-box}
-  body{font-family:Georgia,serif;background:var(--bg);color:var(--ink)}
-  header{padding:12vh 8vw;background:linear-gradient(160deg,#f3e3d3,#e8c9ae)}
-  h1{font-size:clamp(2.4rem,7vw,4rem)}
-  .tag{font-style:italic;color:var(--oak);margin-top:.6rem}
-  .cta{display:inline-block;margin-top:1.6rem;background:var(--ember);color:#fff;
-       padding:.8rem 1.6rem;border-radius:999px;text-decoration:none}
-  section{padding:9vh 8vw}
-  .menu{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  .card{background:#fff;border-radius:18px;padding:1.2rem;box-shadow:0 4px 14px #0001}
-  .price{float:right;color:var(--ember)}
-  footer{padding:6vh 8vw;background:var(--ink);color:#f5ead9}
+  body{background:var(--bg);color:var(--ink);line-height:1.6;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;
+    background-image:radial-gradient(85% 42% at 50% -6%,rgba(255,45,32,.17),transparent 64%)}
+  .wrap{max-width:660px;margin:0 auto;padding:0 22px}
+  a{text-decoration:none;color:inherit}
+  nav{display:flex;align-items:center;gap:16px;padding:16px 22px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;letter-spacing:-.02em}
+  .mark{width:22px;height:22px;border-radius:6px;flex:none;
+    background:conic-gradient(from 210deg,var(--red),var(--red-2),var(--red));
+    box-shadow:0 0 18px rgba(255,45,32,.55)}
+  nav a.lnk{color:var(--mut);font-size:13.5px}
+  .navcta{margin-left:auto;font-size:13px;font-weight:600;
+    border:1px solid var(--line);border-radius:999px;padding:7px 15px}
+  header{padding:44px 0 26px}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#ffb3a8;
+    border:1px solid rgba(255,45,32,.35);border-radius:999px;padding:5px 12px;
+    background:rgba(255,45,32,.08)}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  h1{font-size:clamp(2.35rem,10.5vw,3.4rem);line-height:1.05;letter-spacing:-.035em;
+    font-weight:800;margin:18px 0 14px}
+  h1 span{background:linear-gradient(100deg,var(--red),var(--red-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--mut);font-size:1.02rem;max-width:36ch}
+  .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+  .btn{font-size:14px;font-weight:700;border-radius:10px;padding:12px 22px;
+    background:var(--red);color:#fff;box-shadow:0 10px 30px -10px rgba(255,45,32,.7)}
+  .ghost{font-size:14px;font-weight:600;border-radius:10px;padding:12px 20px;
+    border:1px solid var(--line);color:var(--ink);font-family:var(--mono)}
+  .term{margin:34px 0 6px;border:1px solid var(--line);border-radius:14px;
+    background:#0d0d11;overflow:hidden;
+    box-shadow:0 40px 80px -40px rgba(255,45,32,.35),0 30px 60px -30px rgba(0,0,0,.8)}
+  .tbar{display:flex;align-items:center;gap:6px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .tbar i{width:10px;height:10px;border-radius:50%;background:#2c2c33}
+  .tbar i:first-child{background:rgba(255,45,32,.6)}
+  .tbar b{margin-left:auto;font:500 11px var(--mono);color:var(--mut)}
+  .term pre{padding:15px 16px 17px;font:12.5px/1.85 var(--mono);color:#c9c9d2;overflow-x:auto}
+  .c{color:var(--mut)}.g{color:var(--green)}.r{color:#ff8a7a}.y{color:var(--amber)}
+  section{padding:46px 0 0}
+  .eyebrow{font:700 11px var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--red-2)}
+  h2{font-size:1.65rem;letter-spacing:-.02em;line-height:1.2;font-weight:800;margin:10px 0 22px}
+  .grid{display:grid;gap:12px}
+  .card{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--card)}
+  .card b{display:block;font-size:15px;margin:10px 0 4px}
+  .card p{color:var(--mut);font-size:13.5px}
+  .num{font:700 12px var(--mono);color:var(--red)}
+  .stats{display:flex;gap:8px;margin-top:40px;text-align:center}
+  .stats div{flex:1;border:1px solid var(--line);border-radius:14px;padding:14px 6px;background:var(--card)}
+  .stats b{display:block;font-size:19px;letter-spacing:-.02em}
+  .stats span{font:500 10.5px var(--mono);color:var(--mut);letter-spacing:.06em}
+  .last{margin:52px 0 0;padding:30px 22px 34px;text-align:center;border-top:1px solid var(--line);
+    background:radial-gradient(70% 100% at 50% 115%,rgba(255,45,32,.14),transparent 70%)}
+  .last h2{margin:0 0 8px}
+  .last p{color:var(--mut);font-size:14px;margin-bottom:20px}
+  .curl{display:inline-block;margin-top:16px;font:12px var(--mono);color:var(--mut);
+    border:1px dashed #ffffff22;border-radius:8px;padding:8px 14px}
+  footer{padding:22px;text-align:center;font-size:12.5px;color:#5d5d66}
 </style>
 </head>
 <body>
-<header>
-  <h1>Ember &amp; Oak</h1>
-  <p class="tag">Slow-roasted coffee, baked mornings, warm rooms.</p>
-  <a class="cta" href="#menu">See the menu</a>
+<nav>
+  <a class="logo" href="#"><span class="mark"></span>Strata</a>
+  <a class="lnk" href="#why">Docs</a>
+  <a class="lnk" href="#why">Pricing</a>
+  <a class="navcta" href="#go">Sign in</a>
+</nav>
+<header class="wrap">
+  <p class="pill"><i></i>Now in public beta &middot; free while it lasts</p>
+  <h1>Deploy in seconds.<br><span>Scale on cue.</span></h1>
+  <p class="sub">Strata is the platform layer your side project graduates to:
+  git push, and we handle the servers, certs, queues and 3am pages.</p>
+  <div class="ctas"><a class="btn" href="#go">Start deploying</a>
+  <a class="ghost" href="#why">strata docs &rarr;</a></div>
+  <div class="term">
+    <div class="tbar"><i></i><i></i><i></i><b>~/side-project</b></div>
+    <pre><span class="c">$</span> strata deploy --prod
+<span class="c">&rsaquo;</span> build     <span class="c">........</span> done <span class="c">in</span> <span class="y">8.2s</span>
+<span class="c">&rsaquo;</span> postgres  <span class="c">........</span> migrated <span class="c">(4 new)</span>
+<span class="c">&rsaquo;</span> rollout   <span class="c">........</span> healthy <span class="c">in 9 regions</span>
+<span class="g">&check;</span> live <span class="c">at</span> <span class="r">https://app.strata.dev</span>
+  <span class="c">p99 34ms &middot; scaled to zero overnight</span></pre>
+  </div>
 </header>
-<section id="menu">
-  <h2>House favourites</h2><br>
-  <div class="menu">
-    <div class="card"><h3>Flat White <span class="price">£3.6</span></h3><p>Velvety double ristretto, oat by default.</p></div>
-    <div class="card"><h3>Maple Cardamom Bun <span class="price">£4.2</span></h3><p>Baked 7am &amp; 11am, gone by noon.</p></div>
-    <div class="card"><h3>Pour-over — Huila <span class="price">£4.8</span></h3><p>Washed Colombian, stone fruit &amp; honey.</p></div>
+<section id="why" class="wrap">
+  <p class="eyebrow">The platform</p>
+  <h2>Everything between<br>git push and production.</h2>
+  <div class="grid">
+    <div class="card"><span class="num">01</span>
+      <b>Zero-config deploys</b>
+      <p>Push to main. Buildpacks detect the stack, build it, and roll out behind health checks.</p></div>
+    <div class="card"><span class="num">02</span>
+      <b>Batteries: included</b>
+      <p>Postgres, Redis and object storage provisioned in one click, backed up nightly.</p></div>
+    <div class="card"><span class="num">03</span>
+      <b>A URL for every branch</b>
+      <p>Each PR gets its own preview environment with a seeded database. Merge, and it&rsquo;s gone.</p></div>
+    <div class="card"><span class="num">04</span>
+      <b>Scale to zero</b>
+      <p>Up on traffic, down to nothing at 3am. You pay for requests, not for idle.</p></div>
+  </div>
+  <div class="stats">
+    <div><b>99.99%</b><span>UPTIME</span></div>
+    <div><b>9</b><span>REGIONS</span></div>
+    <div><b>34ms</b><span>P99</span></div>
   </div>
 </section>
-<footer>
-  <h3>Find us</h3>
-  <p>14 Alder Lane · Mon–Fri 7–17 · Sat–Sun 8–18</p>
-</footer>
+<div class="last" id="go">
+  <h2>Live in the next five minutes.</h2>
+  <p>No YAML. No sales call. A free Postgres you&rsquo;ll outgrow eventually.</p>
+  <a class="btn" href="#">Create your first app</a><br>
+  <span class="curl">curl -fsSL get.strata.dev | sh</span>
+</div>
+<footer>Strata &copy; 2026 &middot; status &middot; changelog &middot; @strata</footer>
 </body>
 </html>
 </artifact>
 
-The palette leans on ember-orange against oak browns. Tap the card to preview it — want a booking section or a map embed next?`,
+One red on near-black, the gradient saved for the verb, and the terminal does the actual pitch. Want a pricing table or a dark/light toggle next?`,
       },
     ],
   )
@@ -396,7 +479,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
   }
 
   await db.transaction("rw", db.chats, db.messages, async () => {
-    for (const { c, list } of [kyoto, coffee, script, quiz, images]) {
+    for (const { c, list } of [kyoto, paas, script, quiz, images]) {
       await db.chats.put(c)
       await db.messages.bulkPut(list)
     }

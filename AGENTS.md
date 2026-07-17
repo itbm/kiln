@@ -71,6 +71,16 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   dev/preview).
 - `src/stores/` — zustand: settings (persisted), models cache, live
   streams, temp chats, dialogs.
+- `src/lib/themes/` — app-theme registry (Ember, Classic; one file per
+  theme). Components consult `theme.features.*` flags, never theme ids.
+  Token blocks + theme-scoped component skins live in
+  `src/themes/<id>.css` hung off `data-ui` hooks; fonts are self-hosted
+  Latin subsets (`src/themes/fonts.css`). The pre-paint script in
+  `index.html` mirrors the `theme-<id>` html class.
+- `src/pip/` — Pip the stuntflame (Ember theme's canvas mascot). One
+  file per behaviour under `actions/`, cosmetics under `accessories/`,
+  perch anchors via `data-pip-spot` attributes; see `src/pip/README.md`
+  before teaching him new tricks.
 - `src/lib/compact.ts`, `commands.ts`, `versions.ts`, `artifacts.ts`,
   `questions.ts` — context compaction, slash commands, response versions,
   artifact parsing, interactive `<questions>` blocks.

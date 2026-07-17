@@ -3,7 +3,9 @@ import { Route, Routes } from "react-router-dom"
 import { Toaster } from "@/components/ui/sonner"
 import { DialogHost } from "@/stores/dialogs"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
-import { useApplyTheme, useIsDark } from "@/hooks/use-theme"
+import { useApplyTheme, useAppTheme, useIsDark } from "@/hooks/use-theme"
+import { PipCanvas } from "@/pip/PipCanvas"
+import { useSettings } from "@/stores/settings"
 import { recoverInterrupted } from "@/lib/db"
 import { clearBadge } from "@/lib/notify"
 import { requestPersistentStorage, setupServiceWorker } from "@/lib/sw"
@@ -16,6 +18,8 @@ import SettingsPage from "@/pages/SettingsPage"
 export default function App() {
   useApplyTheme()
   const isDark = useIsDark()
+  const theme = useAppTheme()
+  const pipOn = useSettings((s) => s.pipEnabled)
 
   useEffect(() => {
     const boot = async () => {
@@ -51,6 +55,8 @@ export default function App() {
       </Routes>
       <Toaster position="top-center" theme={isDark ? "dark" : "light"} />
       <DialogHost />
+      {theme.features.pip && pipOn && <PipCanvas />}
+      {theme.Overlay && <theme.Overlay />}
     </ErrorBoundary>
   )
 }

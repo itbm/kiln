@@ -43,6 +43,8 @@ import { checkOpenRouterKey } from "@/lib/providers/openrouter"
 import { checkOllamaKey } from "@/lib/providers/ollama"
 import { ensureNotificationPermission } from "@/lib/notify"
 import { exportAllData, importData } from "@/lib/sync"
+import { THEMES } from "@/lib/themes"
+import { useAppTheme } from "@/hooks/use-theme"
 import type { Skill } from "@/lib/types"
 import { cleanKey, formatBytes } from "@/lib/utils"
 import { confirmDialog } from "@/stores/dialogs"
@@ -351,6 +353,7 @@ function SavedIndicator() {
 export default function SettingsPage() {
   const navigate = useNavigate()
   const s = useSettings()
+  const activeTheme = useAppTheme()
   const [titlePickerOpen, setTitlePickerOpen] = useState(false)
   const [licensesOpen, setLicensesOpen] = useState(false)
   const [skillDialog, setSkillDialog] = useState<{ open: boolean; skill: Skill | null }>({
@@ -361,9 +364,13 @@ export default function SettingsPage() {
   const promptDirty = s.systemPrompt !== null
 
   return (
-    <div className="mx-auto flex h-[var(--app-height)] max-w-2xl flex-col">
+    <div
+      className="mx-auto flex h-[var(--app-height)] max-w-2xl flex-col"
+      data-ui="app-main"
+    >
       <header className="pt-safe">
-        <div className="flex h-12 items-center gap-1 px-2">
+        <div aria-hidden data-ui="topline" />
+        <div className="flex h-12 items-center gap-1 px-2" data-pip-spot="header">
           <Button variant="ghost" size="icon-sm" aria-label="Back" onClick={() => navigate(-1)}>
             <ArrowLeftIcon className="size-5" />
           </Button>
@@ -611,28 +618,66 @@ export default function SettingsPage() {
         </Section>
 
         <Section icon={<PaletteIcon className="size-4.5" />} title="Appearance">
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                { v: "system", label: "System", icon: <MonitorSmartphoneIcon className="size-4" /> },
-                { v: "light", label: "Light", icon: <SunIcon className="size-4" /> },
-                { v: "dark", label: "Dark", icon: <MoonIcon className="size-4" /> },
-              ] as { v: ThemePref; label: string; icon: ReactNode }[]
-            ).map((opt) => (
-              <button
-                key={opt.v}
-                onClick={() => s.set({ theme: opt.v })}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-[12.5px] font-medium transition-colors ${
-                  s.theme === opt.v
-                    ? "border-primary bg-primary/8 text-primary"
-                    : "border-border hover:bg-accent"
-                }`}
-              >
-                {opt.icon}
-                {opt.label}
-              </button>
-            ))}
+          <div className="space-y-1.5">
+            <Label className="text-[13px]">Theme</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => s.set({ appTheme: t.id })}
+                  className={`flex flex-col items-start gap-0.5 rounded-xl border p-3 text-left transition-colors ${
+                    activeTheme.id === t.id
+                      ? "border-primary bg-primary/8"
+                      : "border-border hover:bg-accent"
+                  }`}
+                >
+                  <span
+                    className={`text-[13.5px] font-medium ${
+                      activeTheme.id === t.id ? "text-primary" : ""
+                    }`}
+                  >
+                    {t.name}
+                  </span>
+                  <span className="text-[11.5px] leading-snug text-muted-foreground">
+                    {t.description}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-[13px]">Colour scheme</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { v: "system", label: "System", icon: <MonitorSmartphoneIcon className="size-4" /> },
+                  { v: "light", label: "Light", icon: <SunIcon className="size-4" /> },
+                  { v: "dark", label: "Dark", icon: <MoonIcon className="size-4" /> },
+                ] as { v: ThemePref; label: string; icon: ReactNode }[]
+              ).map((opt) => (
+                <button
+                  key={opt.v}
+                  onClick={() => s.set({ theme: opt.v })}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-[12.5px] font-medium transition-colors ${
+                    s.theme === opt.v
+                      ? "border-primary bg-primary/8 text-primary"
+                      : "border-border hover:bg-accent"
+                  }`}
+                >
+                  {opt.icon}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {activeTheme.features.pip && (
+            <ToggleRow
+              title="Pip the stuntflame"
+              description="A tiny flame who perches around the app — tap him for an eep"
+              checked={s.pipEnabled}
+              onCheckedChange={(v) => s.set({ pipEnabled: v })}
+            />
+          )}
         </Section>
 
         <Section icon={<BellIcon className="size-4.5" />} title="While generating">

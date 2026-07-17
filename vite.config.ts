@@ -29,8 +29,9 @@ export default defineConfig({
         short_name: "Kiln",
         description:
           "A local-first AI chat app. Your keys, your chats, your device.",
-        theme_color: "#faf9f5",
-        background_color: "#faf9f5",
+        // Ember theme (the default) light background — see src/lib/themes
+        theme_color: "#FAF7F1",
+        background_color: "#FAF7F1",
         display: "standalone",
         orientation: "portrait",
         start_url: "/",

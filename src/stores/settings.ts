@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
+import { DEFAULT_THEME_ID } from "@/lib/themes"
 import type { Effort, ModelRef, Skill } from "@/lib/types"
 import { uid } from "@/lib/utils"
 
@@ -14,6 +15,10 @@ export interface Personalization {
 
 interface SettingsState {
   theme: ThemePref
+  /** app theme id from the THEMES registry (src/lib/themes) */
+  appTheme: string
+  /** show Pip the stuntflame, in themes that include him */
+  pipEnabled: boolean
   openrouterKey: string
   ollamaKey: string
   /** "/api/ollama" (same-origin proxy, default) or a direct URL (e.g. LAN Ollama) */
@@ -50,6 +55,8 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       theme: "system",
+      appTheme: DEFAULT_THEME_ID,
+      pipEnabled: true,
       openrouterKey: "",
       ollamaKey: "",
       ollamaBaseUrl: "/api/ollama",
