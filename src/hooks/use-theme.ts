@@ -1,17 +1,24 @@
 import { useEffect } from "react"
+import { getTheme, THEMES, type AppThemeDef } from "@/lib/themes"
 import { useSettings } from "@/stores/settings"
 
 export function useApplyTheme() {
-  const theme = useSettings((s) => s.theme)
+  const scheme = useSettings((s) => s.theme)
+  const appThemeId = useSettings((s) => s.appTheme)
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    const theme = getTheme(appThemeId)
     const apply = () => {
-      const dark = theme === "dark" || (theme === "system" && mq.matches)
-      document.documentElement.classList.toggle("dark", dark)
+      const dark =
+        scheme === "dark" || (scheme === "system" && mq.matches)
+      const root = document.documentElement
+      root.classList.toggle("dark", dark)
+      for (const t of THEMES)
+        root.classList.toggle(t.htmlClass, t.id === theme.id)
       const meta = document.querySelector(
         'meta[name="theme-color"]:not([media])',
       )
-      const color = dark ? "#262624" : "#faf9f5"
+      const color = dark ? theme.themeColor.dark : theme.themeColor.light
       if (meta) meta.setAttribute("content", color)
       else {
         const m = document.createElement("meta")
@@ -23,7 +30,12 @@ export function useApplyTheme() {
     apply()
     mq.addEventListener("change", apply)
     return () => mq.removeEventListener("change", apply)
-  }, [theme])
+  }, [scheme, appThemeId])
+}
+
+/** The active app theme definition (Ember, Classic, …). */
+export function useAppTheme(): AppThemeDef {
+  return getTheme(useSettings((s) => s.appTheme))
 }
 
 export function useIsDark(): boolean {

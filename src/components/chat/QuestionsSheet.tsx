@@ -43,6 +43,8 @@ export function QuestionsCard({
     <button
       onClick={onOpen}
       disabled={answered}
+      data-ui="q-card"
+      data-answered={answered ? "true" : undefined}
       className={cn(
         "my-2 flex w-full max-w-md items-center gap-3 rounded-2xl border p-3 text-left transition",
         answered
@@ -50,7 +52,10 @@ export function QuestionsCard({
           : "border-primary/40 bg-primary/5 hover:shadow-sm active:scale-[0.99]",
       )}
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+      <div
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary"
+        data-ui="q-ico"
+      >
         {answered ? (
           <CheckIcon className="size-5" />
         ) : (

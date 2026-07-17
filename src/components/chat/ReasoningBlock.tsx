@@ -22,6 +22,7 @@ export function ReasoningBlock({
     <div className="mb-2">
       <button
         onClick={() => setOpen(!open)}
+        data-ui="think-pill"
         className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
       >
         <BrainIcon className="size-3.5" />
@@ -31,7 +32,10 @@ export function ReasoningBlock({
         />
       </button>
       {open && (
-        <div className="mt-2 border-l-2 border-border pl-3 text-[13px] leading-relaxed text-thinking whitespace-pre-wrap max-h-72 overflow-y-auto">
+        <div
+          className="mt-2 border-l-2 border-border pl-3 text-[13px] leading-relaxed text-thinking whitespace-pre-wrap max-h-72 overflow-y-auto"
+          data-ui="think-body"
+        >
           {reasoning}
         </div>
       )}

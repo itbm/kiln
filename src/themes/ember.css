@@ -1,0 +1,585 @@
+/* ============================================================
+   Ember — the kiln-brand theme (see src/lib/themes/ember.ts)
+
+   Everything here is scoped under html.theme-ember so the Classic
+   theme (tokens in src/index.css) is untouched. A future theme gets
+   its own file alongside this one with the same structure:
+     1. token overrides (light + dark)
+     2. type & base chrome
+     3. component skins hung off data-ui / data-slot hooks
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
+
+html.theme-ember {
+  /* brand primitives (mockup "Kiln-index-v3 brand sheet", light) */
+  --ember-1: #e8480a;
+  --ember-2: #f59e3d;
+  --ember-ink: #c43c06;
+  --ember-glow: rgba(240, 110, 40, 0.2);
+  --ember-glow-2: rgba(240, 110, 40, 0.1);
+  --ember-sage: #4c7a5d;
+  --ember-glass: rgba(255, 255, 255, 0.62);
+  --ember-glass-2: rgba(255, 255, 255, 0.9);
+  --ember-line-2: rgba(27, 22, 19, 0.17);
+  --ember-bg2: #f1ece3;
+  --ember-btn-ink: #1b0d04;
+  --ember-code-bg: #171310;
+  --ember-code-ink: #ede6dc;
+  --ember-bubble: linear-gradient(
+    120deg,
+    rgba(232, 72, 10, 0.13),
+    rgba(245, 158, 61, 0.09)
+  );
+  --ember-shadow: 0 30px 70px -34px rgba(60, 30, 10, 0.35);
+  --ember-scrim: rgba(27, 22, 19, 0.38);
+  --ember-grad: linear-gradient(120deg, var(--ember-1), var(--ember-2));
+
+  /* semantic tokens */
+  --background: #faf7f1;
+  --foreground: #1b1613;
+  --card: #f5f0e8;
+  --card-foreground: #1b1613;
+  --popover: #f5f0e8;
+  --popover-foreground: #1b1613;
+  --primary: #e8480a;
+  --primary-foreground: #1b0d04;
+  --secondary: #f1ece3;
+  --secondary-foreground: #1b1613;
+  --muted: #f1ece3;
+  --muted-foreground: #6e655c;
+  --accent: rgba(27, 22, 19, 0.06);
+  --accent-foreground: #1b1613;
+  --destructive: #b91c1c;
+  --destructive-foreground: #fef2f2;
+  --border: rgba(27, 22, 19, 0.1);
+  --input: rgba(27, 22, 19, 0.17);
+  --ring: #e8480a;
+  --sidebar: #f5f0e8;
+  --sidebar-foreground: #1b1613;
+  --sidebar-border: rgba(27, 22, 19, 0.1);
+  --bubble-user: #f5e7da;
+  --thinking: #6e655c;
+  color-scheme: light;
+}
+
+html.theme-ember.dark {
+  --ember-1: #ff5a1f;
+  --ember-2: #ffb25c;
+  --ember-ink: #ff9457;
+  --ember-glow: rgba(255, 106, 42, 0.3);
+  --ember-glow-2: rgba(255, 106, 42, 0.14);
+  --ember-sage: #93c2a2;
+  --ember-glass: rgba(255, 255, 255, 0.045);
+  --ember-glass-2: rgba(255, 255, 255, 0.075);
+  --ember-line-2: rgba(243, 238, 231, 0.16);
+  --ember-bg2: #141110;
+  --ember-btn-ink: #160b04;
+  --ember-code-bg: #12100e;
+  --ember-code-ink: #ede6dc;
+  --ember-bubble: linear-gradient(
+    120deg,
+    rgba(255, 90, 31, 0.16),
+    rgba(255, 178, 92, 0.1)
+  );
+  --ember-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7);
+  --ember-scrim: rgba(0, 0, 0, 0.55);
+
+  --background: #0c0a09;
+  --foreground: #f3eee7;
+  --card: #100e0d;
+  --card-foreground: #f3eee7;
+  --popover: #100e0d;
+  --popover-foreground: #f3eee7;
+  --primary: #ff5a1f;
+  --primary-foreground: #160b04;
+  --secondary: #141110;
+  --secondary-foreground: #f3eee7;
+  --muted: #141110;
+  --muted-foreground: #9c938a;
+  --accent: rgba(255, 255, 255, 0.075);
+  --accent-foreground: #f3eee7;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+  --border: rgba(243, 238, 231, 0.1);
+  --input: rgba(243, 238, 231, 0.16);
+  --ring: #ff5a1f;
+  --sidebar: #100e0d;
+  --sidebar-foreground: #f3eee7;
+  --sidebar-border: rgba(243, 238, 231, 0.1);
+  --bubble-user: #2a1a11;
+  --thinking: #9c938a;
+  color-scheme: dark;
+}
+
+/* ---------- 2. Type & base chrome ---------- */
+
+html.theme-ember body {
+  font-family: "Geist Variable", "Geist", Inter, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+}
+html.theme-ember .font-serif {
+  font-family: "Unbounded Variable", "Unbounded", sans-serif;
+  letter-spacing: -0.01em;
+}
+html.theme-ember .font-mono,
+html.theme-ember .prose-chat code,
+html.theme-ember .prose-chat pre {
+  font-family: "Geist Mono Variable", "Geist Mono", ui-monospace, "SF Mono",
+    Menlo, Consolas, monospace;
+}
+html.theme-ember ::selection {
+  background: var(--ember-1);
+  color: #fff;
+}
+html.theme-ember * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ember-line-2) transparent;
+}
+
+/* soft radial glow wash behind each screen (mockup .stage::before) */
+html.theme-ember [data-ui="app-main"] {
+  position: relative;
+}
+html.theme-ember [data-ui="app-main"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      760px 460px at 76% -6%,
+      var(--ember-glow-2),
+      transparent 66%
+    ),
+    radial-gradient(
+      620px 460px at -6% 70%,
+      var(--ember-glow-2),
+      transparent 70%
+    );
+}
+
+/* 2px ember hairline across the top of each screen */
+[data-ui="topline"] {
+  display: none;
+}
+html.theme-ember [data-ui="topline"] {
+  display: block;
+  height: 2px;
+  flex: none;
+  background: linear-gradient(
+    90deg,
+    var(--ember-1),
+    var(--ember-2),
+    var(--ember-1)
+  );
+  background-size: 200% 100%;
+}
+
+/* ---------- 3. Buttons ---------- */
+
+html.theme-ember [data-slot="button"][data-variant="default"] {
+  background-color: transparent;
+  background-image: var(--ember-grad);
+  color: var(--ember-btn-ink);
+  box-shadow: 0 8px 22px -8px var(--ember-glow);
+  border: 0;
+}
+html.theme-ember
+  [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px -8px var(--ember-glow);
+}
+html.theme-ember [data-slot="button"][data-variant="default"]:disabled {
+  box-shadow: none;
+}
+
+/* ---------- 4. Header ---------- */
+
+html.theme-ember [data-ui="app-title"][data-wordmark="true"] {
+  font-family: "Unbounded Variable", "Unbounded", sans-serif;
+  font-weight: 600;
+  font-size: 15.5px;
+  letter-spacing: -0.01em;
+}
+html.theme-ember [data-ui="header-sub"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- 5. Sidebar ---------- */
+
+[data-ui="spyhole"] {
+  display: none;
+}
+html.theme-ember [data-ui="spyhole"] {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: radial-gradient(
+    circle at 35% 35%,
+    var(--ember-2),
+    var(--ember-1)
+  );
+  box-shadow: 0 0 12px 3px var(--ember-glow);
+}
+html.theme-ember [data-ui="sb-logo"] {
+  display: none;
+}
+html.theme-ember [data-ui="sb-brand"] {
+  font-family: "Unbounded Variable", "Unbounded", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  gap: 9px;
+}
+html.theme-ember [data-ui="sb-search"] {
+  background: var(--ember-bg2);
+  border-color: var(--border);
+}
+html.theme-ember [data-ui="sb-group"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  font-weight: 400;
+}
+html.theme-ember [data-ui="chat-row"] {
+  position: relative;
+}
+html.theme-ember [data-ui="chat-row"][data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 9px;
+  bottom: 9px;
+  width: 2.5px;
+  border-radius: 3px;
+  background: linear-gradient(var(--ember-1), var(--ember-2));
+}
+
+/* ---------- 6. Composer ---------- */
+
+html.theme-ember [data-ui="composer-card"] {
+  border-radius: 22px;
+  border: 1px solid var(--ember-line-2);
+  background: var(--ember-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 34px -18px var(--ember-glow);
+  transition: border-color 0.25s;
+}
+html.theme-ember [data-ui="composer-card"]:focus-within {
+  border-color: color-mix(in srgb, var(--ember-1) 55%, transparent);
+}
+html.theme-ember [data-ui="composer-pill"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 400;
+}
+[data-ui="composer-hint"] {
+  display: none;
+}
+html.theme-ember [data-ui="composer-hint"] {
+  display: block;
+  margin-top: 7px;
+  text-align: center;
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+}
+
+/* ---------- 7. Messages ---------- */
+
+html.theme-ember .bg-bubble-user {
+  background-color: transparent;
+  background-image: var(--ember-bubble);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 5px 16px;
+}
+html.theme-ember .prose-chat em {
+  color: var(--ember-ink);
+}
+html.theme-ember .prose-chat code:not(pre code) {
+  background: var(--ember-glass-2);
+  border: 1px solid var(--border);
+}
+html.theme-ember .prose-chat pre {
+  background: var(--ember-code-bg);
+  color: var(--ember-code-ink);
+  border-color: var(--ember-line-2);
+}
+html.theme-ember [data-ui="code-head"] {
+  background: #201a15;
+  border-color: var(--ember-line-2);
+  color: #9c938a;
+}
+/* the code surface is char-dark in both schemes, so in light mode the
+   dark-scheme highlight palette must apply inside it */
+html.theme-ember .prose-chat pre .hljs-keyword,
+html.theme-ember .prose-chat pre .hljs-selector-tag,
+html.theme-ember .prose-chat pre .hljs-meta {
+  color: #c792ea;
+}
+html.theme-ember .prose-chat pre .hljs-string,
+html.theme-ember .prose-chat pre .hljs-attr,
+html.theme-ember .prose-chat pre .hljs-regexp {
+  color: #e0a374;
+}
+html.theme-ember .prose-chat pre .hljs-number,
+html.theme-ember .prose-chat pre .hljs-literal,
+html.theme-ember .prose-chat pre .hljs-symbol {
+  color: #7fc8a9;
+}
+html.theme-ember .prose-chat pre .hljs-title,
+html.theme-ember .prose-chat pre .hljs-title.function_,
+html.theme-ember .prose-chat pre .hljs-name {
+  color: #82aaff;
+}
+html.theme-ember .prose-chat pre .hljs-type,
+html.theme-ember .prose-chat pre .hljs-title.class_,
+html.theme-ember .prose-chat pre .hljs-built_in {
+  color: #e2c07b;
+}
+
+/* reasoning ("Thought for Ns") pill + trace */
+html.theme-ember [data-ui="think-pill"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10.5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 11px;
+  background: var(--ember-glass);
+  transition: border-color 0.2s;
+}
+html.theme-ember [data-ui="think-pill"]:hover {
+  border-color: var(--ember-line-2);
+}
+html.theme-ember [data-ui="think-body"] {
+  border-left: 2px solid;
+  border-image: linear-gradient(var(--ember-1), var(--ember-2)) 1;
+  background: var(--ember-glass);
+  border-radius: 0 12px 12px 0;
+  padding: 10px 13px 10px 14px;
+  font-size: 12.5px;
+}
+
+/* tool-step chip */
+html.theme-ember [data-ui="tool-chip"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10.5px;
+  background: var(--ember-glass);
+  border-color: var(--border);
+}
+
+/* artefact card */
+html.theme-ember [data-ui="art-card"] {
+  border-radius: 14px;
+  background: var(--ember-glass);
+  border-color: var(--border);
+  box-shadow: none;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+html.theme-ember [data-ui="art-card"]:hover {
+  border-color: var(--ember-line-2);
+  background: var(--ember-glass-2);
+}
+html.theme-ember [data-ui="art-ico"] {
+  background-color: transparent;
+  background-image: var(--ember-grad);
+  color: var(--ember-btn-ink);
+  border-radius: 10px;
+}
+html.theme-ember [data-ui="art-sub"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 9.5px;
+}
+
+/* interactive-questions card */
+html.theme-ember [data-ui="q-card"] {
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--ember-1) 35%, transparent);
+  background: var(--ember-glass);
+}
+html.theme-ember [data-ui="q-card"]:hover {
+  background: var(--ember-glass-2);
+}
+html.theme-ember [data-ui="q-card"][data-answered="true"] {
+  border-color: var(--border);
+  opacity: 0.65;
+}
+html.theme-ember [data-ui="q-ico"] {
+  background-color: transparent;
+  background-image: none;
+  border: 1px solid color-mix(in srgb, var(--ember-1) 45%, transparent);
+  color: var(--ember-ink);
+}
+html.theme-ember [data-ui="q-card"][data-answered="true"] [data-ui="q-ico"] {
+  border-color: var(--ember-line-2);
+  color: var(--ember-sage);
+}
+
+/* compaction divider */
+html.theme-ember [data-ui="compact-divider"] {
+  color: var(--ember-ink);
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+html.theme-ember [data-ui="compact-divider"] [data-ui="divider-line"] {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ember-1) 45%, transparent),
+    transparent
+  );
+}
+
+/* context meter pill */
+html.theme-ember [data-ui="ctx-pill"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ember-ink);
+  border-color: color-mix(in srgb, var(--ember-1) 45%, transparent);
+  background: var(--ember-glass);
+}
+
+/* ---------- 8. Greeting ---------- */
+
+html.theme-ember [data-ui="greet-perch"] {
+  width: 120px;
+  height: 96px;
+  margin-bottom: 2px;
+  position: relative;
+}
+html.theme-ember [data-ui="greet-perch"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 112px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2.5px dashed color-mix(in srgb, var(--ember-1) 80%, transparent);
+  opacity: 0.85;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--ember-1) 12%, transparent),
+    transparent 72%
+  );
+}
+html.theme-ember [data-ui="greet-hi"] {
+  font-family: "Unbounded Variable", "Unbounded", sans-serif;
+  font-weight: 600;
+  font-size: 23px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+html.theme-ember [data-ui="grad"] {
+  background: linear-gradient(92deg, var(--ember-1) 10%, var(--ember-2) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html.theme-ember [data-ui="tag"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--ember-glass);
+}
+html.theme-ember [data-ui="tag"][data-hot="true"] {
+  color: var(--ember-ink);
+  border-color: color-mix(in srgb, var(--ember-1) 40%, transparent);
+}
+
+/* ---------- 9. Sheets, dialogs, menus ---------- */
+
+html.theme-ember [data-slot="drawer-overlay"],
+html.theme-ember [data-slot="dialog-overlay"] {
+  background: var(--ember-scrim);
+}
+html.theme-ember
+  [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"] {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+}
+html.theme-ember
+  [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"]
+  > div:first-child {
+  width: 38px;
+  height: 4px;
+  margin-top: 10px;
+  background: var(--ember-line-2);
+}
+html.theme-ember
+  [data-slot="drawer-content"][data-vaul-drawer-direction="left"] {
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+html.theme-ember [data-slot="dialog-content"] {
+  border-radius: 16px;
+  border-color: var(--ember-line-2);
+  box-shadow: var(--ember-shadow);
+}
+html.theme-ember [data-slot="dropdown-menu-content"] {
+  border-radius: 16px;
+  border-color: var(--ember-line-2);
+  box-shadow: var(--ember-shadow);
+}
+
+/* ---------- 10. Artefacts / filter chips ---------- */
+
+html.theme-ember [data-ui="chip"] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 400;
+  background: var(--ember-bg2);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+}
+html.theme-ember [data-ui="chip"]:hover {
+  color: var(--foreground);
+}
+html.theme-ember [data-ui="chip"][data-active="true"] {
+  background: var(--ember-grad);
+  color: var(--ember-btn-ink);
+  border-color: transparent;
+  font-weight: 500;
+}
+
+/* model picker group headings ("Favourites", providers) */
+html.theme-ember [cmdk-group-heading] {
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* ---------- 11. Misc ---------- */
+
+/* streaming caret adopts the ember gradient dot */
+html.theme-ember .streaming-dot {
+  background: radial-gradient(
+    circle at 35% 35%,
+    var(--ember-2),
+    var(--ember-1)
+  );
+}

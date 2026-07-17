@@ -208,7 +208,11 @@ export function Composer(props: ComposerProps) {
 
   return (
     <div className="px-3 pt-1 pb-safe-plus">
-      <div className="rounded-[26px] border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)] dark:shadow-none">
+      <div
+        className="rounded-[26px] border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)] dark:shadow-none"
+        data-ui="composer-card"
+        data-pip-spot="composer"
+      >
         {slashMatches.length > 0 && (
           <div className="border-b border-border/70 px-2 py-1.5">
             {slashMatches.map((c) => (
@@ -339,6 +343,7 @@ export function Composer(props: ComposerProps) {
 
           <button
             onClick={() => setPickerOpen(true)}
+            data-ui="composer-pill"
             className="flex min-w-0 items-center gap-1 rounded-full px-2 py-1.5 text-[12.5px] font-medium text-muted-foreground hover:bg-accent transition-colors"
           >
             {props.imageMode && <ImageIcon className="size-3.5 shrink-0" />}
@@ -352,6 +357,7 @@ export function Composer(props: ComposerProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
+                  data-ui="composer-pill"
                   className={cn(
                     "flex items-center gap-1 rounded-full px-2 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-accent",
                     props.effort === "auto"
@@ -409,6 +415,8 @@ export function Composer(props: ComposerProps) {
           )}
         </div>
       </div>
+      {/* Ember theme only (display gated in CSS) */}
+      <div data-ui="composer-hint">every byte stays on this phone</div>
 
       <ModelPicker
         open={pickerOpen}

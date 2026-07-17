@@ -48,16 +48,40 @@ import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
 import { switchToVersion } from "@/lib/versions"
+import { useAppTheme } from "@/hooks/use-theme"
+import { PROVIDER_NAMES } from "@/lib/providers"
 import { confirmDialog, promptDialog } from "@/stores/dialogs"
-import { findModel } from "@/stores/models"
+import { displayModelName, findModel } from "@/stores/models"
 import { useSettings } from "@/stores/settings"
 import { useStream } from "@/stores/stream"
 import { useTemp } from "@/stores/temp"
 
 function Greeting() {
   const name = useSettings((s) => s.personalization.name)
+  const theme = useAppTheme()
   const h = new Date().getHours()
   const sal = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
+  if (theme.features.brandGreeting)
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-8 pb-24 text-center">
+        {/* Pip's home ring — he perches (and throws axes) here */}
+        <div aria-hidden data-ui="greet-perch" data-pip-spot="ring" />
+        <h2 data-ui="greet-hi">
+          {sal}
+          {name ? `, ${name}` : ""}
+          <span data-ui="grad">.</span>
+        </h2>
+        <p className="mt-2 text-[13.5px] text-muted-foreground">
+          How can I help you today?
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <span data-ui="tag" data-hot="true">
+            keys stay on this device
+          </span>
+          <span data-ui="tag">no accounts · no analytics</span>
+        </div>
+      </div>
+    )
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 pb-24 text-center">
       <div className="text-3xl">✳</div>
@@ -357,6 +381,16 @@ export default function ChatPage() {
     return Math.min(1, estimateWireTokens(chat, messages) / ctx)
   }, [chat, messages, modelRef])
 
+  const theme = useAppTheme()
+  const brandChrome = !!theme.features.brandChrome
+  // Ember chrome: wordmark on the empty home screen, model line under the title
+  const isHome = !chatId && messages.length === 0
+  const headerTitle = brandChrome && isHome ? "Kiln" : (chat?.title ?? "New chat")
+  const headerSubtitle =
+    brandChrome && chat && modelRef
+      ? `${displayModelName(modelRef)} · ${PROVIDER_NAMES[modelRef.provider]}`
+      : undefined
+
   // index of the last message covered by the compaction summary
   const cutoff = chat?.summaryCutoff ?? 0
   let lastCoveredIdx = -1
@@ -371,7 +405,9 @@ export default function ChatPage() {
       {(openSidebar) => (
         <>
           <ChatHeader
-            title={chat?.title ?? "New chat"}
+            title={headerTitle}
+            subtitle={headerSubtitle}
+            wordmark={brandChrome && isHome}
             temporary={chat?.temporary ?? (!chatId && pendingTemp)}
             onOpenSidebar={openSidebar}
             actions={
@@ -460,13 +496,16 @@ export default function ChatPage() {
                       }
                     />
                     {i === lastCoveredIdx && (
-                      <div className="flex items-center gap-2 px-4 text-[11px] text-muted-foreground">
-                        <div className="h-px flex-1 bg-border" />
+                      <div
+                        className="flex items-center gap-2 px-4 text-[11px] text-muted-foreground"
+                        data-ui="compact-divider"
+                      >
+                        <div className="h-px flex-1 bg-border" data-ui="divider-line" />
                         <SparklesIcon className="size-3 shrink-0" />
                         <span>
                           Compacted — messages above are summarised for the model
                         </span>
-                        <div className="h-px flex-1 bg-border" />
+                        <div className="h-px flex-1 bg-border" data-ui="divider-line" />
                       </div>
                     )}
                   </Fragment>
@@ -495,6 +534,7 @@ export default function ChatPage() {
               <div className="flex justify-end px-4 pb-1">
                 <button
                   onClick={() => void runCompact()}
+                  data-ui="ctx-pill"
                   className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/8 px-2.5 py-1 text-[11.5px] font-medium text-primary active:scale-95"
                 >
                   <ScissorsIcon className="size-3" />

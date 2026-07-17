@@ -63,6 +63,7 @@ export function ArtifactCard({
     <button
       onClick={onOpen}
       disabled={streaming}
+      data-ui="art-card"
       className={cn(
         "my-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-xs transition",
         streaming
@@ -70,12 +71,15 @@ export function ArtifactCard({
           : "hover:border-primary/40 hover:shadow-sm active:scale-[0.99]",
       )}
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <div
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+        data-ui="art-ico"
+      >
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-medium">{artifact.title}</div>
-        <div className="text-[12px] text-muted-foreground">
+        <div className="text-[12px] text-muted-foreground" data-ui="art-sub">
           {streaming
             ? `Writing… ${artifact.content.split("\n").length} lines`
             : `${typeLabel(artifact)} · tap to open`}

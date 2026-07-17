@@ -71,7 +71,10 @@ export const MarkdownView = memo(function MarkdownView({
             }
             return (
               <div className="group/code relative my-1">
-                <div className="flex items-center justify-between rounded-t-xl border border-b-0 border-border bg-muted/70 px-3 py-1">
+                <div
+                  className="flex items-center justify-between rounded-t-xl border border-b-0 border-border bg-muted/70 px-3 py-1"
+                  data-ui="code-head"
+                >
                   <span className="font-mono text-[11px] text-muted-foreground">
                     {lang || "code"}
                   </span>
