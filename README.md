@@ -119,8 +119,11 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
 - **PWA** — installable, offline app shell, light/dark (or follow system),
   safe-area aware, iOS keyboard-friendly. Requests **persistent storage**
   so the browser won't evict your chats, shows storage usage in Settings,
-  prompts with an "Update" toast when a new version is deployed, and a
-  crash screen (error boundary) protects against white-screens.
+  and a crash screen (error boundary) protects against white-screens.
+  New versions are detected even when installed to the iOS Home Screen
+  (checked on every return to the app and hourly while it stays open),
+  prompting with an "Update" toast — plus a manual **Check for updates**
+  in Settings → App updates.
 - **Notifications** — optional "reply finished" notification + app badge
   when the app is in the background.
 - **Resilient streaming** — every chunk is persisted to IndexedDB as it
