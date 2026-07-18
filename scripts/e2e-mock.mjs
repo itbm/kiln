@@ -287,6 +287,13 @@ if (!compactionCall) {
   process.exitCode = 1
 }
 
+// --- settings: manual update check (live service worker in preview) ---
+await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })
+await page.getByRole("button", { name: "Check for updates" }).click()
+await page.getByText("You're on the latest version.").waitFor({ timeout: 15000 })
+console.log("ok: manual update check reports up to date")
+await page.screenshot({ path: "shots/e2e-update-check.png" })
+
 // request shape checks
 const first = bodies[0]
 const assertTrue = (cond, msg) => {

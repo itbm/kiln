@@ -16,6 +16,7 @@ import {
   PaletteIcon,
   PencilIcon,
   PlusIcon,
+  RefreshCwIcon,
   ServerIcon,
   SparklesIcon,
   SunIcon,
@@ -42,6 +43,12 @@ import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts"
 import { checkOpenRouterKey } from "@/lib/providers/openrouter"
 import { checkOllamaKey } from "@/lib/providers/ollama"
 import { ensureNotificationPermission } from "@/lib/notify"
+import {
+  applyUpdate,
+  checkForUpdates,
+  useSWUpdate,
+  type UpdateCheckResult,
+} from "@/lib/sw"
 import { exportAllData, importData } from "@/lib/sync"
 import { THEMES } from "@/lib/themes"
 import { useAppTheme } from "@/hooks/use-theme"
@@ -316,6 +323,71 @@ function ToggleRow({
 
 // No sync backend exists yet; the section stays hidden so it can't confuse.
 const SHOW_SERVER_SECTION = false
+
+const UPDATE_CHECK_MESSAGES: Record<
+  Exclude<UpdateCheckResult, "update-ready">,
+  string
+> = {
+  "up-to-date": "You're on the latest version.",
+  offline: "Couldn't check — you appear to be offline.",
+  unavailable: "Update checks aren't available in this browser.",
+}
+
+function UpdatesSection() {
+  const updateReady = useSWUpdate((s) => s.ready)
+  const [checking, setChecking] = useState(false)
+  const [checkResult, setCheckResult] = useState<UpdateCheckResult | null>(null)
+
+  return (
+    <Section
+      icon={<RefreshCwIcon className="size-4.5" />}
+      title="App updates"
+      description={`You're on v${__APP_VERSION__}. Kiln looks for new versions whenever you come back to the app.`}
+    >
+      {updateReady ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/8 p-3">
+          <div>
+            <div className="text-[13.5px] font-medium">Update downloaded</div>
+            <div className="text-[12px] text-muted-foreground">
+              Applying restarts the app — chats and settings are kept.
+            </div>
+          </div>
+          <Button size="sm" onClick={() => applyUpdate()}>
+            Update now
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checking}
+            onClick={() => {
+              setChecking(true)
+              setCheckResult(null)
+              void checkForUpdates().then((r) => {
+                setCheckResult(r)
+                setChecking(false)
+              })
+            }}
+          >
+            {checking ? (
+              <Loader2Icon className="animate-spin" />
+            ) : (
+              <RefreshCwIcon />
+            )}
+            {checking ? "Checking…" : "Check for updates"}
+          </Button>
+          {checkResult && checkResult !== "update-ready" && (
+            <span className="text-[12px] text-muted-foreground">
+              {UPDATE_CHECK_MESSAGES[checkResult]}
+            </span>
+          )}
+        </div>
+      )}
+    </Section>
+  )
+}
 
 function SavedIndicator() {
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle")
@@ -792,6 +864,8 @@ export default function SettingsPage() {
             the chats matter to you.
           </p>
         </Section>
+
+        <UpdatesSection />
 
         <p className="pb-safe pt-2 text-center text-[11.5px] text-muted-foreground">
           Kiln · v{__APP_VERSION__} ·{" "}
