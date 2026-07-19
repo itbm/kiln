@@ -9,7 +9,12 @@ you an eep.
 Mid-conversation the messages are the show, so he calms right down:
 spots flagged `calm` (see `anchors.ts`) confine him to the composer
 ledge, where he mostly sits at the right end and takes slow strolls
-along the line above the textarea — no darting over the chat.
+along the line above the textarea — no darting over the chat. The one
+exception is a streaming artefact: while its card carries
+`data-art-generating` (set by `ArtifactCard`) he darts up and plays
+builder on its top edge — hammer strikes, spark showers, the odd
+approving inspection (`actions/build.ts`) — then returns to the ledge
+the moment it completes.
 
 He is a single `<canvas>` overlay (`PipCanvas.tsx`) driven by a
 requestAnimationFrame engine (`engine.ts`). He is decorative by

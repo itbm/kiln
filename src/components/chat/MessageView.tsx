@@ -212,6 +212,7 @@ export const MessageView = memo(function MessageView({
           <ArtifactCard
             key={`a-${i}`}
             artifact={seg.artifact}
+            generating={streaming && !seg.artifact.complete}
             onOpen={() => onOpenArtifact(seg.artifact)}
           />
         ) : (

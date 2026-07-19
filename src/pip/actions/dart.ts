@@ -17,6 +17,7 @@ export class DartAction implements PipAction {
     const e = this.e
     if (!target) return
     e.clearAct(true)
+    e.windup = 0 /* a dart abandons any half-raised hammer/axe */
     this.from = { x: e.px, y: e.py }
     e.spot = target
     e.mode = "dart"
@@ -61,6 +62,10 @@ export class DartAction implements PipAction {
     e.flareV = 2.2
     for (let i = 0; i < 3; i++)
       e.drops.spawn(e.px, e.py + e.scale * e.S0 * 0.4, false)
+    if (e.spot?.id === "art-site") {
+      e.actions.build.begin()
+      return
+    }
     if (e.spot?.zone === "floor") {
       e.actions.patrol.begin()
       return

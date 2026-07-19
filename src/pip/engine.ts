@@ -1,5 +1,6 @@
 import {
   baseS,
+  buildSiteSpot,
   drawerEl,
   elSpots,
   ovKey,
@@ -455,6 +456,10 @@ export class PipEngine {
         if (k !== this.lastOv) {
           this.lastOv = k
           this.startDart(pickSpot(this.env, this.spot?.id))
+        } else if (this.mode !== "build" && this.spot?.id !== "art-site") {
+          /* a streaming artefact card calls him up to play builder */
+          const site = buildSiteSpot(this.env)
+          if (site) this.startDart(site)
         }
       }
     }
