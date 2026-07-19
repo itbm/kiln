@@ -6,6 +6,11 @@ pull-ups under the header, gets clobbered by the opening sidebar (and
 sulks about it), and jetpacks over to shove it shut. Tapping him earns
 you an eep.
 
+Mid-conversation the messages are the show, so he calms right down:
+spots flagged `calm` (see `anchors.ts`) confine him to the composer
+ledge, where he mostly sits at the right end and takes slow strolls
+along the line above the textarea — no darting over the chat.
+
 He is a single `<canvas>` overlay (`PipCanvas.tsx`) driven by a
 requestAnimationFrame engine (`engine.ts`). He is decorative by
 contract: the canvas is `pointer-events: none`, the tick is wrapped so a

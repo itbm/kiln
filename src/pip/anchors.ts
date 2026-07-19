@@ -127,8 +127,8 @@ export function elSpots(env: AnchorEnv): Spot[] {
     if (!r) return
     out.push({ id, ride: true, ...fn(r), ...extra })
   }
-  const addZone = (zone: "floor" | "bar", w: number) => {
-    const sp: Spot = { id: zone + "Zone", zone, w, fx: Math.random(), ride: true, x: 0, y: 0 }
+  const addZone = (zone: "floor" | "bar", w: number, extra?: Partial<Spot>) => {
+    const sp: Spot = { id: zone + "Zone", zone, w, fx: Math.random(), ride: true, x: 0, y: 0, ...extra }
     const p = zoneResolve(sp, env)
     if (p) {
       sp.x = p.x
@@ -142,6 +142,10 @@ export function elSpots(env: AnchorEnv): Spot[] {
   const dialog = q('[data-slot="dialog-content"]')
   const sheets = bottomSheetEls()
   const ring = q('[data-pip-spot="ring"]')
+  const composer = q('[data-pip-spot="composer"]')
+  /* an open conversation (composer without the home ring): Pip stays out
+     of the way, keeping to the ledge above the textarea */
+  const calmChat = !!composer && !ring
 
   if (drawer) {
     add(
@@ -201,13 +205,18 @@ export function elSpots(env: AnchorEnv): Spot[] {
     )
     addZone("floor", 2)
     addZone("bar", 2)
-  } else {
+  } else if (calmChat) {
+    /* mid-conversation the messages are the show, so no acrobatics over
+       them: a long rest at the ledge's right end, or a slow stroll along
+       the line above the textarea (patrol.ts slows down on calm spots) */
     add(
       "composer",
-      q('[data-pip-spot="composer"]'),
+      composer,
       (r) => ({ x: r.right - S * 0.8, y: r.top - S * 0.5, s: 0.8 }),
-      { w: 3, home: true },
+      { w: 3, home: true, calm: true },
     )
+    addZone("floor", 2, { fx: 0.48 + Math.random() * 0.14, calm: true })
+  } else {
     add(
       "menu",
       q('[data-pip-spot="menu"]'),
@@ -220,30 +229,15 @@ export function elSpots(env: AnchorEnv): Spot[] {
       (r) => ({ x: r.right - S * 0.65, y: r.cy - S * 0.25, s: 0.7 }),
       { w: 2 },
     )
-    /* the newest artefact card in the chat, if it has open air above it */
-    const comp = rectOfEl(q('[data-pip-spot="composer"]'))
-    const hdr = rectOfEl(q('[data-pip-spot="header"]'))
     /* pages without a composer (Settings, Artefacts): hang off the header
        bar instead of hovering awkwardly over the content */
-    if (!comp && hdr) addZone("bar", 2)
-    if (comp) {
-      const cards = Array.from(document.querySelectorAll('[data-ui="art-card"]'))
-      const last = cards[cards.length - 1]
-      const r = rectOfEl(last ?? null)
-      if (r && r.top > (hdr ? hdr.bottom + 12 : 62) && r.bottom < comp.top - 6)
-        out.push({
-          id: "art-card",
-          ride: true,
-          x: r.right - S * 0.55,
-          y: r.top - S * 0.42,
-          s: 0.68,
-          w: 2,
-        })
-    }
+    const hdr = rectOfEl(q('[data-pip-spot="header"]'))
+    if (hdr) addZone("bar", 2)
   }
 
-  /* desktop sidebar (rendered outside any drawer) is fair game too */
-  if (!drawer && !sheets.length && !dialog) {
+  /* desktop sidebar (rendered outside any drawer) is fair game too —
+     except mid-chat, where Pip keeps to the composer ledge */
+  if (!drawer && !sheets.length && !dialog && !calmChat) {
     const foot = Array.from(
       document.querySelectorAll('[data-pip-spot="sb-foot"]'),
     ).find((el) => !el.closest('[data-slot="drawer-content"]'))

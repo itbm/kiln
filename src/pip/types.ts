@@ -17,6 +17,8 @@ export interface Spot {
   home?: boolean
   /** happy landing (wave + smiley eyes) */
   happy?: boolean
+  /** calm spots (open chat): slow strolls, gentle hops, long right-end rests */
+  calm?: boolean
   /** dynamic zones: "ring" (axe stage), "floor" (composer ledge), "bar" (header) */
   zone?: "ring" | "floor" | "bar"
   /** fraction along the zone, for floor/bar placement */

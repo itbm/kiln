@@ -35,10 +35,13 @@ export function PipCanvas() {
   }, [])
 
   return (
+    /* the engine sets the CSS size in px to match the bitmap exactly —
+       percentage sizing drifts from window.innerHeight while the iOS
+       keyboard is up, which drew Pip stretched (see PipEngine.resize) */
     <canvas
       ref={ref}
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-[60] h-full w-full"
+      className="pointer-events-none fixed left-0 top-0 z-[60]"
     />
   )
 }

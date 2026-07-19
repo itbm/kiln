@@ -30,6 +30,12 @@ export class DartAction implements PipAction {
     const ny = (p1.x - e.px) / (d || 1)
     const bulge = (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 80) - 30
     this.ctl = { x: mx + nx * bulge, y: my + ny * bulge - 30 }
+    if (target.calm) {
+      /* hops along the composer ledge stay low, slow and always arc up —
+         no swooping over the conversation (or under, into the keyboard) */
+      this.dur = clamp(d / 700, 0.45, 0.9)
+      this.ctl = { x: mx, y: my - (24 + Math.random() * 30) }
+    }
     if (Math.abs(p1.x - e.px) > 50) e.faceT = p1.x > e.px ? 1 : -1
   }
 
