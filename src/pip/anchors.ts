@@ -113,6 +113,35 @@ export function zoneResolve(sp: Spot, env: AnchorEnv): ZonePoint | null {
   return null
 }
 
+/**
+ * The artefact card currently streaming in — Pip's building site. Only
+ * offered while no overlay covers the chat and the card's top edge sits
+ * comfortably between header and composer (BuildAction uses a looser exit
+ * band so he doesn't flicker on the boundary).
+ */
+export function buildSiteSpot(env: AnchorEnv): Spot | null {
+  if (
+    q('[data-slot="drawer-content"]') ||
+    q('[data-slot="dialog-content"]') ||
+    q('[data-pip-spot="ring"]')
+  )
+    return null
+  const r = rectOfEl(q('[data-art-generating="true"]'))
+  const comp = rectOfEl(q('[data-pip-spot="composer"]'))
+  if (!r || !comp) return null
+  const S = baseS(env.W, env.H)
+  if (r.top < 70 || r.top > comp.top - S * 1.4) return null
+  return {
+    id: "art-site",
+    ride: true,
+    calm: true,
+    w: 2,
+    x: r.right - S * 0.7,
+    y: r.top - S * 0.66 * 0.52,
+    s: 0.66,
+  }
+}
+
 /** All spots available in the current DOM/overlay state. */
 export function elSpots(env: AnchorEnv): Spot[] {
   const S = baseS(env.W, env.H)
@@ -127,8 +156,8 @@ export function elSpots(env: AnchorEnv): Spot[] {
     if (!r) return
     out.push({ id, ride: true, ...fn(r), ...extra })
   }
-  const addZone = (zone: "floor" | "bar", w: number) => {
-    const sp: Spot = { id: zone + "Zone", zone, w, fx: Math.random(), ride: true, x: 0, y: 0 }
+  const addZone = (zone: "floor" | "bar", w: number, extra?: Partial<Spot>) => {
+    const sp: Spot = { id: zone + "Zone", zone, w, fx: Math.random(), ride: true, x: 0, y: 0, ...extra }
     const p = zoneResolve(sp, env)
     if (p) {
       sp.x = p.x
@@ -142,6 +171,10 @@ export function elSpots(env: AnchorEnv): Spot[] {
   const dialog = q('[data-slot="dialog-content"]')
   const sheets = bottomSheetEls()
   const ring = q('[data-pip-spot="ring"]')
+  const composer = q('[data-pip-spot="composer"]')
+  /* an open conversation (composer without the home ring): Pip stays out
+     of the way, keeping to the ledge above the textarea */
+  const calmChat = !!composer && !ring
 
   if (drawer) {
     add(
@@ -201,13 +234,21 @@ export function elSpots(env: AnchorEnv): Spot[] {
     )
     addZone("floor", 2)
     addZone("bar", 2)
-  } else {
+  } else if (calmChat) {
+    /* mid-conversation the messages are the show, so no acrobatics over
+       them: a long rest at the ledge's right end, or a slow stroll along
+       the line above the textarea (patrol.ts slows down on calm spots) */
     add(
       "composer",
-      q('[data-pip-spot="composer"]'),
+      composer,
       (r) => ({ x: r.right - S * 0.8, y: r.top - S * 0.5, s: 0.8 }),
-      { w: 3, home: true },
+      { w: 3, home: true, calm: true },
     )
+    addZone("floor", 2, { fx: 0.48 + Math.random() * 0.14, calm: true })
+    /* while an artefact streams in, its card is his building site */
+    const site = buildSiteSpot(env)
+    if (site) out.push(site)
+  } else {
     add(
       "menu",
       q('[data-pip-spot="menu"]'),
@@ -220,30 +261,15 @@ export function elSpots(env: AnchorEnv): Spot[] {
       (r) => ({ x: r.right - S * 0.65, y: r.cy - S * 0.25, s: 0.7 }),
       { w: 2 },
     )
-    /* the newest artefact card in the chat, if it has open air above it */
-    const comp = rectOfEl(q('[data-pip-spot="composer"]'))
-    const hdr = rectOfEl(q('[data-pip-spot="header"]'))
     /* pages without a composer (Settings, Artefacts): hang off the header
        bar instead of hovering awkwardly over the content */
-    if (!comp && hdr) addZone("bar", 2)
-    if (comp) {
-      const cards = Array.from(document.querySelectorAll('[data-ui="art-card"]'))
-      const last = cards[cards.length - 1]
-      const r = rectOfEl(last ?? null)
-      if (r && r.top > (hdr ? hdr.bottom + 12 : 62) && r.bottom < comp.top - 6)
-        out.push({
-          id: "art-card",
-          ride: true,
-          x: r.right - S * 0.55,
-          y: r.top - S * 0.42,
-          s: 0.68,
-          w: 2,
-        })
-    }
+    const hdr = rectOfEl(q('[data-pip-spot="header"]'))
+    if (hdr) addZone("bar", 2)
   }
 
-  /* desktop sidebar (rendered outside any drawer) is fair game too */
-  if (!drawer && !sheets.length && !dialog) {
+  /* desktop sidebar (rendered outside any drawer) is fair game too —
+     except mid-chat, where Pip keeps to the composer ledge */
+  if (!drawer && !sheets.length && !dialog && !calmChat) {
     const foot = Array.from(
       document.querySelectorAll('[data-pip-spot="sb-foot"]'),
     ).find((el) => !el.closest('[data-slot="drawer-content"]'))

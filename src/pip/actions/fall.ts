@@ -39,6 +39,7 @@ export class FallAction implements PipAction {
         ride: true,
         w: 2,
         fx,
+        calm: !document.querySelector('[data-pip-spot="ring"]'),
         x: e.px,
         y: e.py,
       }

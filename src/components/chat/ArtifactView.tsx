@@ -52,9 +52,12 @@ export function typeLabel(a: ArtifactBlock): string {
 
 export function ArtifactCard({
   artifact,
+  generating,
   onOpen,
 }: {
   artifact: ArtifactBlock
+  /** actively streaming in right now — Pip builds on cards marked with this */
+  generating?: boolean
   onOpen: () => void
 }) {
   const Icon = artifactIcon(artifact.type)
@@ -64,6 +67,7 @@ export function ArtifactCard({
       onClick={onOpen}
       disabled={streaming}
       data-ui="art-card"
+      data-art-generating={generating ? "true" : undefined}
       className={cn(
         "my-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-xs transition",
         streaming

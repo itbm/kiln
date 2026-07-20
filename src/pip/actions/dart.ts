@@ -17,6 +17,7 @@ export class DartAction implements PipAction {
     const e = this.e
     if (!target) return
     e.clearAct(true)
+    e.windup = 0 /* a dart abandons any half-raised hammer/axe */
     this.from = { x: e.px, y: e.py }
     e.spot = target
     e.mode = "dart"
@@ -30,6 +31,12 @@ export class DartAction implements PipAction {
     const ny = (p1.x - e.px) / (d || 1)
     const bulge = (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 80) - 30
     this.ctl = { x: mx + nx * bulge, y: my + ny * bulge - 30 }
+    if (target.calm) {
+      /* hops along the composer ledge stay low, slow and always arc up —
+         no swooping over the conversation (or under, into the keyboard) */
+      this.dur = clamp(d / 700, 0.45, 0.9)
+      this.ctl = { x: mx, y: my - (24 + Math.random() * 30) }
+    }
     if (Math.abs(p1.x - e.px) > 50) e.faceT = p1.x > e.px ? 1 : -1
   }
 
@@ -55,6 +62,10 @@ export class DartAction implements PipAction {
     e.flareV = 2.2
     for (let i = 0; i < 3; i++)
       e.drops.spawn(e.px, e.py + e.scale * e.S0 * 0.4, false)
+    if (e.spot?.id === "art-site") {
+      e.actions.build.begin()
+      return
+    }
     if (e.spot?.zone === "floor") {
       e.actions.patrol.begin()
       return

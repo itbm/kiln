@@ -1,6 +1,7 @@
 import type { PipEngine } from "../engine"
 import type { PipAction, RingAct } from "../types"
 import { AxeThrowAct } from "./axe-throw"
+import { BuildAction } from "./build"
 import { DartAction } from "./dart"
 import { DrawerHitAction } from "./drawer-hit"
 import { FallAction } from "./fall"
@@ -25,6 +26,7 @@ export interface ActionSet {
   fall: FallAction
   hit: DrawerHitAction
   jet: JetCloseAction
+  build: BuildAction
   /** engine.mode → handler for that mode */
   byMode: Record<string, PipAction>
   ringActs: RingAct[]
@@ -38,6 +40,7 @@ export function createActions(e: PipEngine): ActionSet {
   const fall = new FallAction(e)
   const hit = new DrawerHitAction(e)
   const jet = new JetCloseAction(e)
+  const build = new BuildAction(e)
   return {
     rest,
     dart,
@@ -46,6 +49,7 @@ export function createActions(e: PipEngine): ActionSet {
     fall,
     hit,
     jet,
+    build,
     byMode: {
       rest,
       dart,
@@ -55,6 +59,7 @@ export function createActions(e: PipEngine): ActionSet {
       hit,
       jet,
       push: jet,
+      build,
     },
     ringActs: [new AxeThrowAct(e)],
   }

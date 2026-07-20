@@ -1,5 +1,6 @@
 import {
   baseS,
+  buildSiteSpot,
   drawerEl,
   elSpots,
   ovKey,
@@ -129,12 +130,23 @@ export class PipEngine {
   start() {
     if (!this.g) return
     this.resize()
-    const onResize = () => this.resize()
+    /* iOS settles innerHeight/visualViewport at odd moments while the
+       keyboard animates in — re-measure on every signal, and once more
+       after the dust settles */
+    let settle = 0
+    const onResize = () => {
+      this.resize()
+      clearTimeout(settle)
+      settle = window.setTimeout(() => this.resize(), 400)
+    }
     window.addEventListener("resize", onResize)
     window.visualViewport?.addEventListener("resize", onResize)
+    window.visualViewport?.addEventListener("scroll", onResize)
     this.cleanup.push(() => {
+      clearTimeout(settle)
       window.removeEventListener("resize", onResize)
       window.visualViewport?.removeEventListener("resize", onResize)
+      window.visualViewport?.removeEventListener("scroll", onResize)
     })
 
     /* follow dark/light switches from the theme system */
@@ -219,11 +231,21 @@ export class PipEngine {
   }
 
   private resize() {
-    this.W = window.innerWidth
-    this.H = window.innerHeight
-    this.DPR = Math.min(window.devicePixelRatio || 1, 2)
-    this.cv.width = Math.max(1, Math.round(this.W * this.DPR))
-    this.cv.height = Math.max(1, Math.round(this.H * this.DPR))
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const DPR = Math.min(window.devicePixelRatio || 1, 2)
+    if (W === this.W && H === this.H && DPR === this.DPR) return
+    this.W = W
+    this.H = H
+    this.DPR = DPR
+    this.cv.width = Math.max(1, Math.round(W * DPR))
+    this.cv.height = Math.max(1, Math.round(H * DPR))
+    /* size the CSS box explicitly from the same numbers as the bitmap:
+       with the iOS keyboard up, "100%" of the fixed containing block and
+       window.innerHeight can disagree, and any mismatch renders Pip
+       stretched and offset — sometimes down behind the keyboard */
+    this.cv.style.width = `${W}px`
+    this.cv.style.height = `${H}px`
     if (this.reduceMotion) this.renderOnce()
   }
 
@@ -249,12 +271,15 @@ export class PipEngine {
     if (this.reduceMotion || this.busy()) return
     const S = this.S0
     const r = rectOfEl(document.querySelector('[data-pip-spot="composer"]'))
+    const calm = !document.querySelector('[data-pip-spot="ring"]')
     if (r)
       this.startDart({
         id: "composer",
         ride: true,
-        s: 0.9,
+        s: calm ? 0.8 : 0.9,
         happy: true,
+        home: calm,
+        calm,
         w: 1,
         x: r.right - S * 0.8,
         y: r.top - S * 0.5,
@@ -299,7 +324,10 @@ export class PipEngine {
     this.restT = 0
     const sp = this.spot
     this.restDur = sp?.home
-      ? 6 + Math.random() * 3
+      ? sp.calm
+        ? /* chat ledge: linger at the right end, mostly sitting still */
+          9 + Math.random() * 6
+        : 6 + Math.random() * 3
       : sp?.peek
         ? 2.5 + Math.random() * 2
         : 3.5 + Math.random() * 3
@@ -428,6 +456,10 @@ export class PipEngine {
         if (k !== this.lastOv) {
           this.lastOv = k
           this.startDart(pickSpot(this.env, this.spot?.id))
+        } else if (this.mode !== "build" && this.spot?.id !== "art-site") {
+          /* a streaming artefact card calls him up to play builder */
+          const site = buildSiteSpot(this.env)
+          if (site) this.startDart(site)
         }
       }
     }
