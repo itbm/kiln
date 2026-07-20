@@ -7,6 +7,7 @@ export interface PipHandle {
   notify(): void
   celebrate(): void
   flareUp(): void
+  emote(emotion: string): void
   drawerOpening(): void
   drawerClosing(): void
 }
@@ -26,8 +27,15 @@ export const pip = {
   celebrate: () => current?.celebrate(),
   /** a message was sent — flare up */
   flare: () => current?.flareUp(),
+  /** the reply's hidden <emotion> tag arrived (see src/lib/emotions.ts) */
+  emote: (emotion: string) => current?.emote(emotion),
   /** the sidebar drawer is sliding open (Pip may get clobbered) */
   drawerOpening: () => current?.drawerOpening(),
   /** the sidebar drawer was dismissed (Pip jets over to shove it shut) */
   drawerClosing: () => current?.drawerClosing(),
 }
+
+/* dev-only handle for poking moods from the console:
+   __pip.emote("crying") */
+if (import.meta.env.DEV)
+  (window as unknown as { __pip: typeof pip }).__pip = pip

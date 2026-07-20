@@ -13,6 +13,8 @@ import { buildSystemPrompt, TITLE_PROMPT } from "./prompts"
 import { completeText, streamChat } from "./providers"
 import { getEnabledTools, executeTool } from "./tools"
 import { contentWithoutArtifacts } from "./artifacts"
+import { findEmotion } from "./emotions"
+import { pip } from "@/pip/bus"
 import { notifyChatDone, acquireWakeLock, releaseWakeLock } from "./notify"
 import { estimateWireTokens, compactChat } from "./compact"
 import { beginNewVersion } from "./versions"
@@ -244,6 +246,20 @@ async function runAssistantTurn(
   let reasoning = ""
   let reasoningStart = 0
   let reasoningMs: number | undefined
+  /* the hidden <emotion> tag opens the reply — watch the head of the
+     stream and hand the mood to Pip the moment it completes (a no-op
+     when he isn't mounted). A misplaced tag is still caught by the final
+     full-text scan when the turn ends. */
+  let emotionSent = false
+  let emotionHeadDone = false
+  const feedEmotion = (finished = false) => {
+    if (emotionSent || isImage || (emotionHeadDone && !finished)) return
+    const emo = findEmotion(finished ? content : content.slice(0, 600))
+    if (emo) {
+      emotionSent = true
+      pip.emote(emo)
+    } else if (content.length > 600) emotionHeadDone = true
+  }
   const steps: ToolStep[] = []
   const images: { id: string; dataUrl: string }[] = []
   let lastPersist = Date.now()
@@ -307,6 +323,7 @@ async function runAssistantTurn(
           if (reasoningStart && reasoningMs === undefined)
             reasoningMs = Date.now() - reasoningStart
           content += ev.text
+          feedEmotion()
         } else if (ev.type === "image") {
           // some providers repeat the same image in later stream chunks
           if (!images.some((im) => im.dataUrl === ev.dataUrl))
@@ -374,6 +391,7 @@ async function runAssistantTurn(
   clearTimeout(pushTimer)
   if (reasoningStart && reasoningMs === undefined)
     reasoningMs = Date.now() - reasoningStart
+  if (finalStatus === "done") feedEmotion(true)
 
   const finalMsg: Message = {
     ...snapshot(),

@@ -27,19 +27,23 @@ const SWAP_EVERY = () => 8 + Math.random() * 5
 
 /**
  * Foreman Pip: while an artefact card streams in he stands on its top edge
- * and "builds" it, cycling through his toolkit as the job drags on —
- * hammer strikes with spark showers, then a hand saw (wood chips fly),
- * then a little two-handed drill pumping into the edge. The moment the card finishes
- * (its data-art-generating flag clears) he darts back down to the
- * composer ledge. He's sent up here by the engine's site check
- * (engine.tick) and DartAction hands over on landing.
+ * — hard hat on, naturally — and "builds" it, cycling through his toolkit
+ * as the job drags on: hammer strikes with spark showers, then a hand saw
+ * (wood chips fly), then a little two-handed drill pumping into the edge.
+ * The moment the card finishes (its data-art-generating flag clears) he
+ * darts back down to the composer ledge. He's sent up here by the engine's
+ * site check (engine.tick) and DartAction hands over on landing.
  *
  * Past the 30-second mark the job is officially Taking Ages, so he lodges
  * a complaint with physics: grabs the top edge, fires up the jetpack and
- * airlifts the actual card — a real CSS transform on the DOM node — sways
- * it about, and plonks it back down. The transform is decorative and is
- * always undone: on completion, on any exit path (done/exit), and exit()
- * is invoked by whoever steals the mode (see engine.leaveMode).
+ * airlifts the actual card — a real CSS transform on the DOM node. Given
+ * headroom he takes it right up to just under the header (ascend), kills
+ * the engines, pops a parachute and pendulum-drifts the whole rig back
+ * down (chute) before plonking it home with a bounce; in a cramped
+ * viewport he falls back to a low hover-and-sway (carry). The transform
+ * is decorative and is always undone: on completion, on any exit path
+ * (done/exit), and exit() is invoked by whoever steals the mode (see
+ * engine.leaveMode).
  */
 export class BuildAction implements PipAction {
   id = "build"
@@ -52,6 +56,8 @@ export class BuildAction implements PipAction {
     | "scoot"
     | "grab"
     | "hoist"
+    | "ascend"
+    | "chute"
     | "carry"
     | "plonk" = "raise"
   private phT = 0
@@ -71,11 +77,17 @@ export class BuildAction implements PipAction {
   /* the heave: offsets we are currently applying to the real card */
   private card: HTMLElement | null = null
   private cdx = 0
+  private cdy = 0
   private crot = 0
   private lift = 12
   private jetK = 0
   private thenGrab = false /* current scoot ends in a grab, not a bout */
   private cdxPrev = 0
+  /* the parachute ride */
+  private ascendH = 0 /* how high above its resting spot the card goes */
+  private canopyK = 0 /* canopy deployment/fold envelope */
+  private deployT = 0
+  private jetAtPlonk = 1 /* jet flame left when the plonk starts */
 
   constructor(private e: PipEngine) {}
 
@@ -106,6 +118,8 @@ export class BuildAction implements PipAction {
     return (
       this.phase === "grab" ||
       this.phase === "hoist" ||
+      this.phase === "ascend" ||
+      this.phase === "chute" ||
       this.phase === "carry" ||
       this.phase === "plonk"
     )
@@ -135,6 +149,7 @@ export class BuildAction implements PipAction {
 
   private setCard(dx: number, dy: number, rot: number) {
     this.cdx = dx
+    this.cdy = dy
     this.crot = rot
     if (this.card)
       this.card.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) rotate(${rot.toFixed(3)}deg)`
@@ -145,7 +160,7 @@ export class BuildAction implements PipAction {
   private release() {
     const el = this.card
     this.card = null
-    this.cdx = this.crot = 0
+    this.cdx = this.cdy = this.crot = 0
     if (!el) return
     el.style.transition = ""
     el.style.transform = ""
@@ -209,13 +224,15 @@ export class BuildAction implements PipAction {
     const comp = rectOfEl(document.querySelector('[data-pip-spot="composer"]'))
     const S = e.S0
     /* card finished, covered by an overlay, or scrolled out of reach →
-       straight back down to the ledge */
+       straight back down to the ledge. Judge by where the card RESTS
+       (r includes our own transform, which mid-ride is a big lift). */
+    const restTop = r ? r.top - this.cdy : 0
     if (
       !el ||
       !r ||
       !comp ||
-      r.top < 54 ||
-      r.top > comp.top - S * 0.9 ||
+      restTop < 54 ||
+      restTop > comp.top - S * 0.9 ||
       document.querySelector('[data-slot="drawer-content"], [data-slot="dialog-content"]')
     ) {
       this.done()
@@ -232,10 +249,17 @@ export class BuildAction implements PipAction {
 
     /* ride the card's top edge (it drifts as the chat streams; while he
        holds it, the rect already includes our own transform — he and the
-       card move as one) */
+       card move as one). Airborne he tracks the edge rigidly: smoothing
+       would leave him trailing behind the climb. */
     const footY = r.top - S * 0.66 * 0.52
     const tx = clamp(r.left + this.wx * r.width, r.left + 16, r.right - 12)
-    const kf = 1 - Math.pow(0.0008, dt)
+    const airborne =
+      this.phase === "hoist" ||
+      this.phase === "ascend" ||
+      this.phase === "chute" ||
+      this.phase === "carry" ||
+      this.phase === "plonk"
+    const kf = airborne ? 1 : 1 - Math.pow(0.0008, dt)
     e.px += (tx - e.px) * kf
     e.py += (footY - e.py) * kf
     e.scale += (0.66 - e.scale) * (1 - Math.pow(0.01, dt))
@@ -330,7 +354,50 @@ export class BuildAction implements PipAction {
         e.drops.spawn(e.px - e.face * e.Sc * 0.55, e.py + e.Sc * 0.5, false, null, 10)
       if (this.phT >= this.phDur) {
         this.cdxPrev = 0
-        this.enter("carry", 3.2 + Math.random() * 1.4)
+        /* headroom decides the show: enough sky → full parachute ride up
+           to just under the header (the margin leaves space for Pip and
+           the canopy above the card); cramped → the old low hover-and-sway */
+        const room = restTop - (54 + S * 2)
+        if (room > 70) {
+          this.ascendH = clamp(room, 70, e.H * 0.55)
+          this.enter("ascend", clamp(this.ascendH / 230, 0.8, 1.8))
+        } else this.enter("carry", 3.2 + Math.random() * 1.4)
+      }
+    } else if (this.phase === "ascend") {
+      /* full throttle: haul the card up toward the header */
+      const k = easeIO(clamp(this.phT / this.phDur, 0, 1))
+      this.grip(el)
+      this.jetK = 1
+      this.setCard(
+        n1(t * 2.1) * 4 * k,
+        -lerp(this.lift, this.ascendH, k),
+        clamp(n1(t * 2.6) * 0.8 * k, -2, 2),
+      )
+      if (Math.random() < dt * 34)
+        e.drops.spawn(e.px - e.face * e.Sc * 0.55, e.py + e.Sc * 0.5, false, null, 10)
+      if (this.phT >= this.phDur) {
+        this.deployT = 0
+        this.cdxPrev = this.cdx
+        this.enter("chute", clamp(this.ascendH / 105, 1.6, 3.8))
+      }
+    } else if (this.phase === "chute") {
+      /* engines off, canopy pops — pendulum-drift the rig back down */
+      const k = clamp(this.phT / this.phDur, 0, 1)
+      this.grip(el)
+      this.jetK = Math.max(0, this.jetK - dt * 5)
+      this.deployT += dt
+      this.canopyK = easeOutBack(clamp(this.deployT / 0.4, 0, 1))
+      const sway = Math.min(26, r.width * 0.08) * this.canopyK
+      const dx = Math.sin(this.phT * 4.3) * sway * (1 - k * 0.35)
+      const dy = -lerp(this.ascendH, this.lift, easeIO(k))
+      const rot = clamp(-dx * 0.055 + n1(t * 1.9) * 0.3, -3, 3)
+      this.setCard(dx, dy, rot)
+      const vx = dx - this.cdxPrev
+      if (Math.abs(vx) > 0.12) e.faceT = vx > 0 ? 1 : -1
+      this.cdxPrev = dx
+      if (this.phT >= this.phDur) {
+        this.jetAtPlonk = this.jetK
+        this.enter("plonk", 0.55)
       }
     } else if (this.phase === "carry") {
       /* airborne removals: sway the card about, then bring it home */
@@ -348,12 +415,17 @@ export class BuildAction implements PipAction {
       this.cdxPrev = dx
       if (Math.random() < dt * 26)
         e.drops.spawn(e.px - e.face * e.Sc * 0.55, e.py + e.Sc * 0.5, false, null, 10)
-      if (this.phT >= this.phDur) this.enter("plonk", 0.55)
+      if (this.phT >= this.phDur) {
+        this.jetAtPlonk = 1
+        this.enter("plonk", 0.55)
+      }
     } else {
-      /* plonk: down she goes, with a little bounce on arrival */
+      /* plonk: down she goes, with a little bounce on arrival (after a
+         chute ride the jet is already out and the canopy folds away) */
       const k = clamp(this.phT / this.phDur, 0, 1)
       const b = easeOutBack(k) /* overshoots past 1 → a squash-down dip */
-      this.jetK = 1 - k
+      this.jetK = this.jetAtPlonk * (1 - k)
+      this.canopyK = Math.max(0, this.canopyK - dt * 5)
       this.setCard(this.cdx * (1 - k * k), -this.lift * (1 - b), this.crot * (1 - k))
       if (this.phT >= this.phDur) {
         this.hitK = 1
@@ -373,6 +445,8 @@ export class BuildAction implements PipAction {
     this.release()
     this.thenGrab = false
     this.jetK = 0
+    this.canopyK = 0
+    this.deployT = 0
     e.windup = 0
     e.gigPulse = 0.9 /* proud of his work */
     e.flareV = 2.4
@@ -386,6 +460,8 @@ export class BuildAction implements PipAction {
     this.release()
     this.thenGrab = false
     this.jetK = 0
+    this.canopyK = 0
+    this.deployT = 0
   }
 
   /* ---------- the toolkit (front layer: in his hands, over his body) ----------
@@ -429,19 +505,138 @@ export class BuildAction implements PipAction {
     c.stroke()
   }
 
-  drawFront(_t: number, pose: PipPose) {
+  /** safety first: a yellow hard hat perched on the flame crown (unit
+      space; it inherits every lean and squash from the pose transform) */
+  private drawHardHat(c: CanvasRenderingContext2D) {
+    c.save()
+    c.lineJoin = "round"
+    /* dome */
+    c.beginPath()
+    c.moveTo(-0.4, -0.68)
+    c.bezierCurveTo(-0.43, -1.02, -0.2, -1.13, 0, -1.13)
+    c.bezierCurveTo(0.2, -1.13, 0.43, -1.02, 0.4, -0.68)
+    c.closePath()
+    c.fillStyle = "#FFC93C"
+    c.fill()
+    c.lineWidth = 0.05
+    c.strokeStyle = "#9C6A0A"
+    c.stroke()
+    /* centre ridge */
+    c.beginPath()
+    if (typeof c.roundRect === "function")
+      c.roundRect(-0.08, -1.19, 0.16, 0.12, 0.05)
+    else c.rect(-0.08, -1.19, 0.16, 0.12)
+    c.fillStyle = "#FFC93C"
+    c.fill()
+    c.lineWidth = 0.04
+    c.stroke()
+    /* brim over the dome's base */
+    c.beginPath()
+    c.ellipse(0, -0.66, 0.55, 0.095, 0, 0, 6.2832)
+    c.fillStyle = "#F5AE1E"
+    c.fill()
+    c.lineWidth = 0.045
+    c.stroke()
+    /* a little shine */
+    c.beginPath()
+    c.ellipse(-0.16, -0.97, 0.09, 0.05, -0.5, 0, 6.2832)
+    c.fillStyle = "rgba(255,255,255,.4)"
+    c.fill()
+    c.restore()
+  }
+
+  /** the parachute: cream canopy with kiln-orange gores, risers down to
+      his raised hands. Scales with canopyK so it pops open and folds. */
+  private drawChute(c: CanvasRenderingContext2D, t: number) {
+    const k = clamp(this.canopyK, 0, 1.15)
+    if (k < 0.04) return
+    const e = this.e
+    const canopy = () => {
+      c.beginPath()
+      c.moveTo(-1.0, -1.04)
+      c.bezierCurveTo(-1.06, -1.78, -0.48, -1.98, 0, -1.98)
+      c.bezierCurveTo(0.48, -1.98, 1.06, -1.78, 1.0, -1.04)
+      /* scalloped hem */
+      for (let i = 0; i < 4; i++)
+        c.quadraticCurveTo(0.75 - i * 0.5, -0.9, 0.5 - i * 0.5, -1.04)
+      c.closePath()
+    }
+    c.save()
+    /* hangs from his hands; a touch of counter-sway against the drift */
+    c.translate(0, -0.62)
+    c.rotate(n1(t * 1.4) * 0.05 - this.cdx * 0.004)
+    c.scale(k, k)
+    c.lineCap = "round"
+    c.lineJoin = "round"
+    /* risers */
+    c.lineWidth = 0.035
+    c.strokeStyle = e.PAL.steelEdge
+    for (const s of [-1, 1]) {
+      c.beginPath()
+      c.moveTo(s * 0.44, 0.02)
+      c.lineTo(s * 0.97, -1.03)
+      c.stroke()
+    }
+    /* canopy fill, gores clipped inside, outline last */
+    canopy()
+    c.fillStyle = e.PAL.innIn
+    c.fill()
+    c.save()
+    c.clip()
+    c.fillStyle = e.PAL.bodyMid
+    c.globalAlpha = 0.8
+    for (const s of [-1, 0, 1]) {
+      c.beginPath()
+      c.moveTo(s * 0.2 - 0.11, -1.94)
+      c.quadraticCurveTo(s * 0.55 - 0.14, -1.5, s * 0.62 - 0.16, -0.92)
+      c.lineTo(s * 0.62 + 0.16, -0.92)
+      c.quadraticCurveTo(s * 0.55 + 0.14, -1.5, s * 0.2 + 0.11, -1.94)
+      c.closePath()
+      c.fill()
+    }
+    c.restore()
+    canopy()
+    c.lineWidth = 0.05
+    c.strokeStyle = e.PAL.outline
+    c.stroke()
+    c.restore()
+  }
+
+  drawFront(t: number, pose: PipPose) {
     const e = this.e
     const c = e.g
     if (!c || e.mode !== "build") return
     const grabbing = this.phase === "grab"
-    if (this.carrying() && !grabbing) return
     c.save()
     /* the same transform drawPip uses, so grip points line up exactly and
        held things lean/squash with his body */
     c.translate(pose.x, pose.y)
     c.rotate(pose.tilt)
     c.scale(pose.S * pose.sx * pose.face, pose.S * pose.sy)
+    /* the site uniform: hard hat stays on through every phase */
+    this.drawHardHat(c)
     const g = pose.grip ?? this.toolGrip()
+    if (
+      this.phase === "chute" ||
+      (this.phase === "plonk" && this.canopyK > 0.04)
+    ) {
+      /* canopy and risers first, then both arms reach up to the toggles
+         (the canopy keeps folding through the start of the plonk) */
+      this.drawChute(c, t)
+      if (pose.gripB)
+        armStroke(c, -0.4, 0.2, pose.gripB.x, pose.gripB.y, -0.14, e.PAL.outline, e.PAL.limb)
+      armStroke(c, 0.4, 0.2, g.x, g.y, 0.14, e.PAL.outline, e.PAL.limb)
+      if (pose.gripB) this.handOn(c, pose.gripB.x, pose.gripB.y)
+      this.handOn(c, g.x, g.y)
+      c.restore()
+      return
+    }
+    if (this.carrying() && !grabbing) {
+      /* hoist/ascend/carry/plonk: hands are full of card, jet arms are
+         drawPip's — nothing more to add over him */
+      c.restore()
+      return
+    }
     if (grabbing) {
       /* no tool — both arms reach down over the card's top edge */
       if (pose.gripB)
@@ -638,6 +833,22 @@ export class BuildAction implements PipAction {
       pose.sy *= 1 + 0.05 * this.jetK
       pose.gazeY = 0.6
       pose.effort = Math.max(pose.effort, 0.9)
+    } else if (this.phase === "ascend") {
+      pose.jet = Math.max(pose.jet, 1)
+      pose.tilt -= e.face * 0.05 /* leaning back into the climb */
+      pose.sy *= 1.04
+      pose.gazeX = e.face * 0.15
+      pose.gazeY = -0.35 /* eyes on the summit */
+      pose.effort = Math.max(pose.effort, 0.85)
+    } else if (this.phase === "chute") {
+      pose.jet = Math.max(pose.jet, this.jetK)
+      /* hands up on the parachute toggles (drawFront draws those arms) */
+      pose.grip = { x: 0.44, y: -0.6 }
+      pose.gripB = { x: -0.44, y: -0.6 }
+      pose.tilt += this.cdx * 0.005
+      pose.y += Math.sin(t * 2.3) * U * 0.015
+      pose.gazeY = 0.3
+      pose.effort = Math.max(pose.effort, 0.2)
     } else if (this.phase === "carry") {
       pose.jet = Math.max(pose.jet, 1)
       pose.y += Math.sin(t * 7) * U * 0.02
@@ -646,6 +857,11 @@ export class BuildAction implements PipAction {
       pose.effort = Math.max(pose.effort, 0.5)
     } else if (this.phase === "plonk") {
       pose.jet = Math.max(pose.jet, this.jetK)
+      if (this.canopyK > 0.04) {
+        /* hands stay on the toggles while the canopy folds away */
+        pose.grip = { x: 0.44, y: -0.6 }
+        pose.gripB = { x: -0.44, y: -0.6 }
+      }
       pose.gazeY = 0.7
       pose.effort = Math.max(pose.effort, 0.5 * this.jetK)
     } else if (this.phase === "inspect") {

@@ -7,14 +7,28 @@ composer ledge, does pull-ups under the header, gets clobbered by the
 opening sidebar (and sulks about it), and jetpacks over to shove it
 shut. Tapping him earns you an eep.
 
+He also feels the conversation. While he's on stage the system prompt
+asks the model to open every reply with a hidden `<emotion>…</emotion>`
+tag (see `src/lib/emotions.ts`); the stream watcher in `src/lib/engine.ts`
+hands it to `pip.emote()` the moment it completes, and `splitContent`
+strips it so users never see it. Quick feelings (happy, surprised, angry)
+are pulses on his existing envelopes; lingering ones set a mood that
+colours everything for a while and then fades — mildly sad news banks his
+flame down, droops his brows and mouth and swaps his idle hops for sighs;
+truly heartbreaking news (`crying`) adds welling eyes, falling tears and
+a sniffly shudder; `excited` keeps him bouncing, `thoughtful` sends his
+gaze drifting upward between slow blinks, `worried` is a low-grade frown.
+A glum mood also mutes the end-of-reply celebration — he darts home
+without the wave and confetti.
+
 Mid-conversation the messages are the show, so he calms right down:
 spots flagged `calm` (see `anchors.ts`) confine him to the composer
 ledge, where he mostly sits at the right end and takes slow strolls
 along the line above the textarea — no darting over the chat. The one
 exception is a streaming artefact: while its card carries
-`data-art-generating` (set by `ArtifactCard`) he darts up and plays
-builder on its top edge (`actions/build.ts`) — and the longer the job
-runs, the bigger the show:
+`data-art-generating` (set by `ArtifactCard`) he darts up, puts on his
+yellow **hard hat** (site rules) and plays builder on its top edge
+(`actions/build.ts`) — and the longer the job runs, the bigger the show:
 
 - **Hammer** first: strikes, spark showers, the odd approving
   inspection.
@@ -23,14 +37,17 @@ runs, the bigger the show:
   the edge — it judders him *and* the card) → round again.
 - Past **30 s** he decides the job needs relocating: grabs the top
   edge, fires the jetpack and airlifts the actual card — a real CSS
-  transform on the DOM node — sways it about, plonks it back down with
-  a bounce, and goes back to work (repeat roughly every half minute).
-  The transform is always undone: `BuildAction.exit()` releases it, and
-  `engine.leaveMode()` invokes that from every path that can take the
-  mode over (darting off, drawer hit, jetpack call-out, teardown, error
-  retirement). Each card's clock/tool/heave state lives in a WeakMap
-  keyed on the card element, so popping off for an overlay doesn't
-  reset it.
+  transform on the DOM node. Given headroom he hauls it right up to
+  just under the header, cuts the engines, pops a cream-and-orange
+  **parachute** and pendulum-drifts the whole rig back down before
+  plonking it home with a bounce (in a cramped viewport he falls back
+  to the old low hover-and-sway). Then back to work — repeat roughly
+  every half minute. The transform is always undone:
+  `BuildAction.exit()` releases it, and `engine.leaveMode()` invokes
+  that from every path that can take the mode over (darting off, drawer
+  hit, jetpack call-out, teardown, error retirement). Each card's
+  clock/tool/heave state lives in a WeakMap keyed on the card element,
+  so popping off for an overlay doesn't reset it.
 
 He returns to the ledge the moment the card completes.
 

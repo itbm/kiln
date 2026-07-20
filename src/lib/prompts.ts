@@ -1,5 +1,7 @@
 import type { Chat } from "./types"
 import { getSettings } from "@/stores/settings"
+import { getTheme } from "./themes"
+import { EMOTION_PROMPT } from "./emotions"
 
 export const DEFAULT_SYSTEM_PROMPT = `You are Kiln, a thoughtful AI assistant in a mobile chat app. Today's date is {{date}}.
 
@@ -70,6 +72,10 @@ export function buildSystemPrompt(chat?: Chat | null): string {
       out += `\n### ${sk.name}\n${sk.instructions.trim()}\n`
     }
   }
+
+  /* mood tags are only requested while Pip is actually on stage to act
+     on them (theme includes him + Settings toggle on) */
+  if (s.pipEnabled && getTheme(s.appTheme).features.pip) out += EMOTION_PROMPT
 
   return out
 }
