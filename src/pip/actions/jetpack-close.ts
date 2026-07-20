@@ -36,6 +36,7 @@ export class JetCloseAction implements PipAction {
     if (e.reduceMotion || this.busyFlag) return false
     const dr = rectOfEl(drawerEl())
     if (!dr) return false
+    e.leaveMode(true)
     this.busyFlag = true
     e.clearAct(true)
     e.mode = "jet"

@@ -54,6 +54,11 @@ export interface PipPose {
   effort: number
   walkPh: number | null
   windup: number
+  /** forward hand is gripping at this unit-space point: drawPip skips that
+      arm and the action's front layer draws it OVER the held tool instead */
+  grip: { x: number; y: number } | null
+  /** same for the back hand — two-handed grips (heaving the card edge) */
+  gripB: { x: number; y: number } | null
 }
 
 /**
@@ -64,10 +69,16 @@ export interface PipAction {
   id: string
   /** advance one frame (only called while this action owns the mode) */
   update(dt: number, t: number): void
-  /** scene drawing beneath Pip (e.g. the pull-up bar) */
+  /** back layer: scene drawing beneath Pip (pull-up bar, free-standing kit) */
   draw?(t: number): void
   /** contribute to the final pose just before Pip is drawn */
   pose?(pose: PipPose, t: number): void
+  /**
+   * front layer: drawn after Pip, over his body — anything he holds
+   * (tools in his hands). Receives the final pose so held items can be
+   * drawn in his transformed unit space, anchored to pose.grip/gripB.
+   */
+  drawFront?(t: number, pose: PipPose): void
   /** the mode is being left / interrupted */
   exit?(fast?: boolean): void
 }

@@ -109,13 +109,16 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   Favourites group at the top.
 - **Themes & Pip** — two switchable app themes (Settings → Appearance):
   **Ember**, the char-and-ember brand look with Unbounded/Geist type, and
-  **Classic**, the original cream & clay. Ember comes with **Pip the
+  **Classic**, the original cream & clay. Both come with **Pip the
   stuntflame** — a tiny canvas mascot who perches around the UI, throws
   axes on the home screen, strolls the composer ledge, does pull-ups
   under the header, gets clobbered by the opening sidebar and jetpacks
-  over to shove it shut (toggle him off in Settings; he respects reduced
-  motion). Themes and Pip's tricks are both modular — see
-  `src/lib/themes/` and `src/pip/README.md`.
+  over to shove it shut. While an artefact streams in he plays builder on
+  its card, cycling hammer, saw and drill as the job drags on —
+  and past 30 seconds he airlifts the card about before plonking it back
+  down (toggle him off in Settings; he respects reduced motion). Themes
+  and Pip's tricks are both modular — see `src/lib/themes/` and
+  `src/pip/README.md`.
 - **PWA** — installable, offline app shell, light/dark (or follow system),
   safe-area aware, iOS keyboard-friendly. Requests **persistent storage**
   so the browser won't evict your chats, shows storage usage in Settings,

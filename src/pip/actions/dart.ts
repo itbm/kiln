@@ -16,6 +16,7 @@ export class DartAction implements PipAction {
   begin(target: Spot | null) {
     const e = this.e
     if (!target) return
+    e.leaveMode(true) /* let the outgoing action tidy up (no-op for most) */
     e.clearAct(true)
     e.windup = 0 /* a dart abandons any half-raised hammer/axe */
     this.from = { x: e.px, y: e.py }
