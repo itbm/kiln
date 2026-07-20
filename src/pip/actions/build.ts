@@ -1,4 +1,5 @@
 import { elSpots, rectOfEl } from "../anchors"
+import { armStroke } from "../draw/pip"
 import type { PipEngine } from "../engine"
 import { clamp, easeIO, easeOutBack, lerp, n1 } from "../math"
 import type { PipAction, PipPose } from "../types"
@@ -28,9 +29,9 @@ const SWAP_EVERY = () => 8 + Math.random() * 5
  * Foreman Pip: while an artefact card streams in he stands on its top edge
  * and "builds" it, cycling through his toolkit as the job drags on —
  * hammer strikes with spark showers, then a hand saw (wood chips fly),
- * then a pneumatic drill that judders the pair of them. The moment the
- * card finishes (its data-art-generating flag clears) he darts back down
- * to the composer ledge. He's sent up here by the engine's site check
+ * then a hand drill buzzing into the edge. The moment the card finishes
+ * (its data-art-generating flag clears) he darts back down to the
+ * composer ledge. He's sent up here by the engine's site check
  * (engine.tick) and DartAction hands over on landing.
  *
  * Past the 30-second mark the job is officially Taking Ages, so he lodges
@@ -65,7 +66,7 @@ export class BuildAction implements PipAction {
   private scootPh = 0
   private sawPh = 0
   private sawOff = 0 /* stroke offset, -1..1 along the blade */
-  private jit = 0 /* drill judder, unit space (drives drill + hands + card) */
+  private jit = 0 /* drill buzz along the bit axis (drives drill + hand) */
   private log: SiteLog = { t: 0, tool: 0, swapAt: 10, heaveAt: HEAVE_AT }
   /* the heave: offsets we are currently applying to the real card */
   private card: HTMLElement | null = null
@@ -274,13 +275,13 @@ export class BuildAction implements PipAction {
         this.nextUp(r.width)
       }
     } else if (this.phase === "drill") {
-      /* brrrrRRRT — the drill, his hands and the card all judder as one
-         (the card only a little, and let go of smoothly) */
+      /* vvvrRRT — drill and hand buzz along the bit; the card trembles
+         a touch under the bit (and is let go of smoothly) */
       this.jit = n1(t * 45) * 0.05
       this.grip(el)
-      this.setCard(n1(t * 44) * 0.7, Math.abs(n1(t * 51)) * 0.5, 0)
+      this.setCard(n1(t * 44) * 0.35, Math.abs(n1(t * 51)) * 0.3, 0)
       e.flareV = Math.max(e.flareV, 1.4)
-      const hx = e.px + e.face * e.Sc * 0.55 /* the chisel tip */
+      const hx = e.px + e.face * e.Sc * 1.0 /* the bit's tip */
       if (Math.random() < dt * 16) e.drops.spawn(hx, r.top - 1, true)
       if (Math.random() < dt * 3)
         e.drops.spawn(hx, r.top - 4, false, e.PAL.smoke, 40)
@@ -387,12 +388,11 @@ export class BuildAction implements PipAction {
     this.jetK = 0
   }
 
-  /* ---------- the toolkit (front layer: drawn over him, in his hands) ----------
-     Tools live on drawFront and are anchored to his hands: pose() points
-     pose.grip (and gripB for the drill) at the handle, the arm reaches
-     there, the tool draws over his body in his transformed unit space,
-     and a closed hand caps the handle. Front layer = held things; the
-     back layer (draw) stays for free-standing scenery. */
+  /* ---------- the toolkit (front layer: in his hands, over his body) ----------
+     pose() flags the gripping hand via pose.grip (drawPip then skips that
+     arm), and drawFront draws tool first, then the arm + hand OVER its
+     handle — so arm, hand and tool always coincide. draw() (the back
+     layer) stays free for scenery. */
 
   /** forward-hand position for the current tool & phase, in unit space
       (+x = the way he faces, y down, body ≈ 2 units tall) */
@@ -401,9 +401,9 @@ export class BuildAction implements PipAction {
     if (tool === "hammer") {
       if (this.phase === "strike") {
         const k = clamp(this.phT / this.phDur, 0, 1) ** 2
-        return { x: lerp(0.34, 0.62, k), y: lerp(-0.5, 0.1, k) }
+        return { x: lerp(0.36, 0.62, k), y: lerp(-0.48, 0.1, k) }
       }
-      if (this.phase === "raise") return { x: 0.34, y: -0.5 }
+      if (this.phase === "raise") return { x: 0.36, y: -0.48 }
       return { x: 0.52, y: 0.3 } /* carried along between bouts */
     }
     if (tool === "saw") {
@@ -411,48 +411,50 @@ export class BuildAction implements PipAction {
       const off = this.phase === "saw" ? this.sawOff * 0.15 : 0
       return { x: 0.6 + off * 0.68, y: 0.26 + off * 0.73 }
     }
-    /* drill: front end of the T-handle while it runs, else lugged along */
-    if (this.phase === "drill") return { x: 0.8, y: -0.02 + this.jit }
-    return { x: 0.62, y: 0.15 }
+    /* hand drill: pistol grip, bit angled down-forward into the edge —
+       while it runs the whole thing (hand included) buzzes along the bit */
+    if (this.phase === "drill")
+      return { x: 0.42 + this.jit * 0.66, y: 0.32 + this.jit * 0.75 }
+    return { x: 0.55, y: 0.28 } /* lugged along, bit up */
   }
 
-  /** a closed hand over a handle (matches armStroke's open hand size) */
-  private handOn(c: CanvasRenderingContext2D, x: number, y: number) {
-    const e = this.e
-    c.beginPath()
-    c.arc(x, y, 0.1, 0, 6.2832)
-    c.fillStyle = e.PAL.limb
-    c.fill()
-    c.lineWidth = 0.032
-    c.strokeStyle = e.PAL.outline
-    c.stroke()
-  }
-
-  drawFront(_t: number, pose: PipPose) {
+  drawFront(t: number, pose: PipPose) {
     const e = this.e
     const c = e.g
     if (!c || e.mode !== "build") return
-    if (this.carrying()) return /* tools are down while he heaves */
+    const grabbing = this.phase === "grab"
+    if (this.carrying() && !grabbing) return
     c.save()
     /* the same transform drawPip uses, so grip points line up exactly and
-       the tool leans/squashes with his body */
+       held things lean/squash with his body */
     c.translate(pose.x, pose.y)
     c.rotate(pose.tilt)
     c.scale(pose.S * pose.sx * pose.face, pose.S * pose.sy)
+    if (grabbing) {
+      /* no tool — both arms reach down over the card's top edge */
+      if (pose.gripB)
+        armStroke(c, -0.4, 0.2, pose.gripB.x, pose.gripB.y, 0.16, e.PAL.outline, e.PAL.limb)
+      if (pose.grip)
+        armStroke(c, 0.4, 0.2, pose.grip.x, pose.grip.y, 0.1, e.PAL.outline, e.PAL.limb)
+      c.restore()
+      return
+    }
     const tool = TOOLS[this.log.tool]
     if (tool === "hammer") this.drawHammer(c)
     else if (tool === "saw") this.drawSaw(c)
-    else this.drawDrill(c)
+    else this.drawDrill(c, t)
+    /* the gripping arm goes on top, hand landing on the handle */
+    const g = this.toolGrip()
+    armStroke(c, 0.4, 0.2, g.x, g.y, 0.12, e.PAL.outline, e.PAL.limb)
     c.restore()
   }
 
-  /** the mallet, swung from his raised hand (unit space, pivot = grip) */
+  /** the mallet, swung from his raised fist (unit space, pivot = grip) */
   private drawHammer(c: CanvasRenderingContext2D) {
     const e = this.e
     const g = this.toolGrip()
     c.save()
     c.translate(g.x, g.y)
-    c.save()
     c.rotate(this.ang)
     const hl = 0.72
     c.lineCap = "round"
@@ -477,18 +479,15 @@ export class BuildAction implements PipAction {
     c.strokeStyle = e.PAL.steelEdge
     c.stroke()
     c.restore()
-    this.handOn(c, 0, 0)
-    c.restore()
   }
 
-  /** hand saw: his hand in the D-grip, toothed blade biting down-forward
+  /** hand saw: D-grip around his hand, toothed blade biting down-forward
       into the edge; it rests in its kerf between strokes */
   private drawSaw(c: CanvasRenderingContext2D) {
     const e = this.e
     const g = this.toolGrip()
     c.save()
     c.translate(g.x, g.y)
-    c.save()
     c.rotate(0.82)
     c.lineJoin = "round"
     /* blade with teeth along the working edge */
@@ -509,7 +508,7 @@ export class BuildAction implements PipAction {
     c.lineWidth = 0.04
     c.strokeStyle = e.PAL.steelEdge
     c.stroke()
-    /* D-grip, wrapped around his hand */
+    /* D-grip, which the front-layer hand lands inside */
     c.beginPath()
     if (typeof c.roundRect === "function")
       c.roundRect(-0.17, -0.15, 0.32, 0.3, 0.11)
@@ -521,69 +520,72 @@ export class BuildAction implements PipAction {
     c.strokeStyle = e.PAL.wood
     c.stroke()
     c.restore()
-    this.handOn(c, 0, 0)
-    c.restore()
   }
 
-  /** pneumatic drill, held in both hands in front of him: T-handle at
-      chest height, stout body, chisel pumping into the surface — the
-      whole rig, his hands and the card judder together while it runs */
-  private drawDrill(c: CanvasRenderingContext2D) {
+  /** hand drill: pistol grip in his fist, body slanting up across him,
+      bit angled down-forward into the edge. Local frame: +x along the
+      bit axis; the grip/hand is the origin. */
+  private drawDrill(c: CanvasRenderingContext2D, t: number) {
     const e = this.e
+    const g = this.toolGrip()
     const running = this.phase === "drill"
     c.save()
-    if (running) c.translate(0.55, -0.02 + this.jit)
-    else {
-      /* lugged along one-handed, tipped back */
-      const g = this.toolGrip()
-      c.translate(g.x, g.y)
-      c.rotate(-0.3)
-    }
+    c.translate(g.x, g.y)
+    c.rotate(running ? 0.85 : 0.35)
+    c.lineJoin = "round"
+    c.lineCap = "round"
+    /* pistol grip up from the hand to the body */
+    c.strokeStyle = e.PAL.woodDark
+    c.lineWidth = 0.14
+    c.beginPath()
+    c.moveTo(0, 0.0)
+    c.lineTo(0, -0.26)
+    c.stroke()
+    c.strokeStyle = e.PAL.wood
+    c.lineWidth = 0.085
+    c.beginPath()
+    c.moveTo(0, -0.02)
+    c.lineTo(0, -0.24)
+    c.stroke()
     const rr = (x: number, y: number, w: number, h: number, r0: number) => {
       c.beginPath()
       if (typeof c.roundRect === "function") c.roundRect(x, y, w, h, r0)
       else c.rect(x, y, w, h)
     }
-    c.lineJoin = "round"
-    /* T-handle */
-    rr(-0.27, -0.055, 0.54, 0.11, 0.05)
-    c.fillStyle = e.PAL.steel
-    c.fill()
-    c.lineWidth = 0.04
-    c.strokeStyle = e.PAL.steelEdge
-    c.stroke()
-    /* body */
-    rr(-0.115, 0.055, 0.23, 0.42, 0.06)
-    c.fillStyle = e.PAL.steel
-    c.fill()
-    c.lineWidth = 0.05
-    c.stroke()
-    /* vents */
-    c.lineWidth = 0.028
-    for (let i = 0; i < 2; i++) {
-      c.beginPath()
-      c.moveTo(-0.07, 0.16 + i * 0.09)
-      c.lineTo(0.07, 0.16 + i * 0.09)
-      c.stroke()
-    }
-    /* collar + chisel down to the surface */
-    rr(-0.06, 0.44, 0.12, 0.13, 0.03)
+    /* motor bump at the back */
+    rr(-0.44, -0.43, 0.12, 0.14, 0.04)
     c.fillStyle = e.PAL.steelEdge
     c.fill()
-    c.beginPath()
-    c.moveTo(-0.035, 0.55)
-    c.lineTo(0.035, 0.55)
-    c.lineTo(0, 0.74 + (running ? this.jit * 0.4 : 0))
-    c.closePath()
+    /* body along the axis */
+    rr(-0.36, -0.46, 0.62, 0.18, 0.07)
     c.fillStyle = e.PAL.steel
     c.fill()
-    c.lineWidth = 0.03
+    c.lineWidth = 0.045
+    c.strokeStyle = e.PAL.steelEdge
     c.stroke()
-    /* his hands on the bar (both while it runs, one while lugging) */
+    /* chuck */
+    rr(0.26, -0.425, 0.13, 0.11, 0.03)
+    c.fillStyle = e.PAL.steelEdge
+    c.fill()
+    /* bit, with flute ticks that flicker while it spins */
+    c.strokeStyle = e.PAL.steelEdge
+    c.lineWidth = 0.038
+    c.beginPath()
+    c.moveTo(0.39, -0.37)
+    c.lineTo(0.62, -0.37)
+    c.stroke()
     if (running) {
-      this.handOn(c, 0.25, 0)
-      this.handOn(c, -0.25, 0)
-    } else this.handOn(c, 0, 0)
+      const ph = Math.sign(Math.sin(t * 40)) * 0.02
+      c.lineWidth = 0.016
+      c.strokeStyle = e.PAL.steel
+      for (let i = 0; i < 3; i++) {
+        const x = 0.43 + i * 0.06
+        c.beginPath()
+        c.moveTo(x - 0.02, -0.35 - ph)
+        c.lineTo(x + 0.02, -0.39 + ph)
+        c.stroke()
+      }
+    }
     c.restore()
   }
 
@@ -601,12 +603,11 @@ export class BuildAction implements PipAction {
       pose.x += e.face * this.sawOff * U * 0.04
       pose.effort = Math.max(pose.effort, 0.25 + Math.abs(Math.cos(this.sawPh)) * 0.3)
     } else if (this.phase === "drill") {
-      /* both hands on the bar; the judder runs through him gently */
-      pose.gripB = { x: 0.3, y: -0.02 + this.jit }
-      pose.y += n1(t * 47) * U * 0.018
-      pose.gazeX = e.face * 0.3
-      pose.gazeY = 0.65
-      pose.effort = Math.max(pose.effort, 0.6)
+      /* leaning on the work, eyes on the bit */
+      pose.tilt += e.face * 0.06
+      pose.gazeX = e.face * 0.35
+      pose.gazeY = 0.7
+      pose.effort = Math.max(pose.effort, 0.55)
     } else if (this.phase === "scoot") {
       pose.gazeY = 0.15
       pose.tilt += e.face * 0.04

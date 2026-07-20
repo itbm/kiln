@@ -100,7 +100,10 @@ function innerPath(
   ctx.closePath()
 }
 
-function armStroke(
+/** One arm: shoulder → hand with a slight elbow bend, capped by the hand.
+    Exported so an action's front layer can draw a gripping arm OVER a held
+    tool (see PipAction.drawFront) with identical rendering. */
+export function armStroke(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
@@ -473,12 +476,10 @@ export function drawPip(
     if ((o.windup || 0) > 0.02) {
       Rh = { x: 0.28, y: -0.62 - o.windup * 0.14 }
     }
-    /* a held tool owns the hand(s): the arm reaches to the grip point and
-       the tool (front layer) draws the closed hand over its handle */
-    if (o.grip) Rh = { x: o.grip.x, y: o.grip.y }
-    const Lf = o.gripB ?? Lh
-    armStroke(ctx, -0.4, 0.2, Lf.x, Lf.y, o.gripB ? 0.14 : -0.1 - o.hide * 0.1, C_out, C_lmb)
-    armStroke(ctx, 0.4, 0.2, Rh.x, Rh.y + (o.grip ? 0 : wave * 0.5), 0.1 + covR * 0.12, C_out, C_lmb)
+    /* a gripping hand belongs to the front layer: the action draws that
+       arm OVER the held tool (drawFront), so it isn't drawn here */
+    if (!o.gripB) armStroke(ctx, -0.4, 0.2, Lh.x, Lh.y, -0.1 - o.hide * 0.1, C_out, C_lmb)
+    if (!o.grip) armStroke(ctx, 0.4, 0.2, Rh.x, Rh.y + wave * 0.5, 0.1 + covR * 0.12, C_out, C_lmb)
   }
 
   /* ---- accessories (hats & friends, see src/pip/accessories) ---- */

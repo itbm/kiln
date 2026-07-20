@@ -19,8 +19,8 @@ runs, the bigger the show:
 - **Hammer** first: strikes, spark showers, the odd approving
   inspection.
 - Every ~8–13 s he swaps tools — hammer → **hand saw** (leaning strokes,
-  wood chips) → **pneumatic drill** (judders him *and* the card) →
-  round again.
+  wood chips) → **hand drill** (buzzing into the edge, the card
+  trembling under the bit) → round again.
 - Past **30 s** he decides the job needs relocating: grabs the top
   edge, fires the jetpack and airlifts the actual card — a real CSS
   transform on the DOM node — sways it about, plonks it back down with

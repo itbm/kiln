@@ -54,10 +54,10 @@ export interface PipPose {
   effort: number
   walkPh: number | null
   windup: number
-  /** forward-hand target override in unit space — where a held tool's grip
-      is (the arm reaches here; the tool draws on the front layer) */
+  /** forward hand is gripping at this unit-space point: drawPip skips that
+      arm and the action's front layer draws it OVER the held tool instead */
   grip: { x: number; y: number } | null
-  /** back-hand target override — for two-handed tools (pneumatic drill) */
+  /** same for the back hand — two-handed grips (heaving the card edge) */
   gripB: { x: number; y: number } | null
 }
 

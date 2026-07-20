@@ -114,7 +114,7 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   axes on the home screen, strolls the composer ledge, does pull-ups
   under the header, gets clobbered by the opening sidebar and jetpacks
   over to shove it shut. While an artefact streams in he plays builder on
-  its card, cycling hammer, saw and pneumatic drill as the job drags on —
+  its card, cycling hammer, saw and hand drill as the job drags on —
   and past 30 seconds he airlifts the card about before plonking it back
   down (toggle him off in Settings; he respects reduced motion). Themes
   and Pip's tricks are both modular — see `src/lib/themes/` and
