@@ -417,6 +417,18 @@ export class BuildAction implements PipAction {
     return { x: 0.62, y: 0.15 }
   }
 
+  /** a closed hand wrapped over a handle (caps the arm drawn beneath) */
+  private handOn(c: CanvasRenderingContext2D, x: number, y: number) {
+    const e = this.e
+    c.beginPath()
+    c.arc(x, y, 0.1, 0, 6.2832)
+    c.fillStyle = e.PAL.limb
+    c.fill()
+    c.lineWidth = 0.032
+    c.strokeStyle = e.PAL.outline
+    c.stroke()
+  }
+
   drawFront(_t: number, pose: PipPose) {
     const e = this.e
     const c = e.g
@@ -429,18 +441,33 @@ export class BuildAction implements PipAction {
     c.translate(pose.x, pose.y)
     c.rotate(pose.tilt)
     c.scale(pose.S * pose.sx * pose.face, pose.S * pose.sy)
-    if (!grabbing) {
-      const tool = TOOLS[this.log.tool]
-      if (tool === "hammer") this.drawHammer(c)
-      else if (tool === "saw") this.drawSaw(c)
-      else this.drawDrill(c)
-    }
-    /* gripping arms go on top, hands landing on the handles (both arms
-       when two-handed: the running drill's T-bar, the heave's grab) */
-    if (pose.gripB)
-      armStroke(c, -0.4, 0.2, pose.gripB.x, pose.gripB.y, 0.16, e.PAL.outline, e.PAL.limb)
     const g = pose.grip ?? this.toolGrip()
-    armStroke(c, 0.4, 0.2, g.x, g.y, grabbing ? 0.1 : 0.12, e.PAL.outline, e.PAL.limb)
+    if (grabbing) {
+      /* no tool — both arms reach down over the card's top edge */
+      if (pose.gripB)
+        armStroke(c, -0.4, 0.2, pose.gripB.x, pose.gripB.y, 0.16, e.PAL.outline, e.PAL.limb)
+      armStroke(c, 0.4, 0.2, g.x, g.y, 0.1, e.PAL.outline, e.PAL.limb)
+      c.restore()
+      return
+    }
+    const tool = TOOLS[this.log.tool]
+    if (tool === "drill") {
+      /* sandwich hold: arms reach behind the drill, closed hands wrap
+         over the T-bar — the drill sits IN his hands */
+      if (pose.gripB)
+        armStroke(c, -0.4, 0.2, pose.gripB.x, pose.gripB.y, 0.16, e.PAL.outline, e.PAL.limb)
+      armStroke(c, 0.4, 0.2, g.x, g.y, 0.12, e.PAL.outline, e.PAL.limb)
+      this.drawDrill(c)
+      if (pose.gripB) {
+        this.handOn(c, pose.gripB.x, pose.gripB.y)
+        this.handOn(c, g.x, g.y)
+      } else this.handOn(c, g.x, g.y)
+    } else {
+      /* hammer/saw: tool first, gripping arm over it, hand on the handle */
+      if (tool === "hammer") this.drawHammer(c)
+      else this.drawSaw(c)
+      armStroke(c, 0.4, 0.2, g.x, g.y, 0.12, e.PAL.outline, e.PAL.limb)
+    }
     c.restore()
   }
 
