@@ -92,7 +92,7 @@ export class BuildAction implements PipAction {
     this.hitK = 0
     this.jetK = 0
     this.thenGrab = false
-    this.enter("raise", 0.3)
+    this.bout() /* opens with whichever tool this card's diary says */
   }
 
   private enter(phase: BuildAction["phase"], dur: number) {
@@ -265,7 +265,7 @@ export class BuildAction implements PipAction {
       this.sawOff = Math.sin(this.sawPh)
       const speed = Math.abs(Math.cos(this.sawPh))
       if (speed > 0.5 && Math.random() < dt * 5) {
-        const hx = e.px + e.face * e.Sc * 0.95
+        const hx = e.px + e.face * e.Sc * 1.05 /* where blade meets the edge */
         e.drops.spawn(hx, r.top - 1, true, Math.random() < 0.5 ? e.PAL.wood : e.PAL.woodMid, 12)
       }
       if (Math.random() < dt * 1.2) e.flareV = 1.6
@@ -278,7 +278,7 @@ export class BuildAction implements PipAction {
       this.grip(el)
       this.setCard(n1(t * 44) * 0.7, Math.abs(n1(t * 51)) * 0.5, 0)
       e.flareV = Math.max(e.flareV, 1.4)
-      const hx = e.px + e.face * e.Sc * 0.55
+      const hx = e.px + e.face * e.Sc * 0.85 /* the chisel tip */
       if (Math.random() < dt * 16) e.drops.spawn(hx, r.top - 1, true)
       if (Math.random() < dt * 3)
         e.drops.spawn(hx, r.top - 4, false, e.PAL.smoke, 40)
@@ -434,17 +434,19 @@ export class BuildAction implements PipAction {
     c.restore()
   }
 
-  /** hand saw: D-handle by his hip, toothed blade biting down-forward
-      into the edge; between cuts it rides on his shoulder */
+  /** hand saw: D-handle at arm's reach, toothed blade biting down-forward
+      into the edge. Pivoted well forward of him — like the hammer, it
+      draws *under* him, so it must stay clear of his silhouette — and
+      between strokes it simply rests in its kerf, carpenter-style. */
   private drawSaw(c: CanvasRenderingContext2D) {
     const e = this.e
     const U = e.Sc
     const f = e.face < 0 ? -1 : 1
     const cutting = this.phase === "saw"
     c.save()
-    c.translate(e.px + f * U * 0.5, e.py + U * 0.18)
+    c.translate(e.px + f * U * 0.72, e.py + U * 0.18)
     c.scale(f, 1)
-    c.rotate(cutting ? 0.82 : -0.42)
+    c.rotate(0.82)
     c.translate(cutting ? this.sawOff * U * 0.15 : 0, 0)
     c.lineJoin = "round"
     /* blade with teeth along the working edge */
@@ -480,7 +482,9 @@ export class BuildAction implements PipAction {
   }
 
   /** pneumatic drill: T-handle, stout steel body, chisel on the surface —
-      the whole rig (and Pip, and the card) judders while it runs */
+      the whole rig (and Pip, and the card) judders while it runs. Stood
+      at arm's reach ahead of him so none of it hides behind his body
+      (tools draw *under* him). */
   private drawDrill(c: CanvasRenderingContext2D, t: number) {
     const e = this.e
     const U = e.Sc
@@ -488,7 +492,7 @@ export class BuildAction implements PipAction {
     const active = this.phase === "drill"
     const jy = active ? Math.abs(n1(t * 45)) * U * 0.05 : 0
     c.save()
-    c.translate(e.px + f * U * 0.55, e.py + jy)
+    c.translate(e.px + f * U * 0.85, e.py + jy)
     c.scale(f, 1)
     if (this.phase === "scoot") c.rotate(-0.3) /* lugged along, tipped back */
     const rr = (x: number, y: number, w: number, h: number, r0: number) => {
