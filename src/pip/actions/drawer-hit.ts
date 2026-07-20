@@ -19,6 +19,7 @@ export class DrawerHitAction implements PipAction {
   begin() {
     const e = this.e
     if (e.mode === "hit") return
+    e.leaveMode(true)
     e.mode = "hit"
     e.clearAct(true)
     e.hitT = 0

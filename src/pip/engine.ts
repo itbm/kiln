@@ -217,6 +217,11 @@ export class PipEngine {
         // Pip is decorative — he must never take the app down with him
         if (++this.errors >= 3) {
           cancelAnimationFrame(this.raf)
+          try {
+            this.leaveMode(true) /* hand back anything he was holding */
+          } catch {
+            /* already retiring */
+          }
           console.warn("Pip retired after repeated errors:", err)
         }
       }
@@ -225,6 +230,11 @@ export class PipEngine {
   }
 
   destroy() {
+    try {
+      this.leaveMode(true)
+    } catch {
+      /* teardown must not throw */
+    }
     cancelAnimationFrame(this.raf)
     for (const fn of this.cleanup) fn()
     this.cleanup = []
@@ -309,6 +319,12 @@ export class PipEngine {
 
   busy(): boolean {
     return this.mode === "jet" || this.mode === "push" || this.mode === "hit"
+  }
+
+  /** let the current mode's action clean up after itself (build putting the
+      artefact card back, say) before another action takes the mode over */
+  leaveMode(fast?: boolean) {
+    this.actions.byMode[this.mode]?.exit?.(fast)
   }
 
   startDart(target: Spot | null) {
