@@ -473,8 +473,12 @@ export function drawPip(
     if ((o.windup || 0) > 0.02) {
       Rh = { x: 0.28, y: -0.62 - o.windup * 0.14 }
     }
-    armStroke(ctx, -0.4, 0.2, Lh.x, Lh.y, -0.1 - o.hide * 0.1, C_out, C_lmb)
-    armStroke(ctx, 0.4, 0.2, Rh.x, Rh.y + wave * 0.5, 0.1 + covR * 0.12, C_out, C_lmb)
+    /* a held tool owns the hand(s): the arm reaches to the grip point and
+       the tool (front layer) draws the closed hand over its handle */
+    if (o.grip) Rh = { x: o.grip.x, y: o.grip.y }
+    const Lf = o.gripB ?? Lh
+    armStroke(ctx, -0.4, 0.2, Lf.x, Lf.y, o.gripB ? 0.14 : -0.1 - o.hide * 0.1, C_out, C_lmb)
+    armStroke(ctx, 0.4, 0.2, Rh.x, Rh.y + (o.grip ? 0 : wave * 0.5), 0.1 + covR * 0.12, C_out, C_lmb)
   }
 
   /* ---- accessories (hats & friends, see src/pip/accessories) ---- */

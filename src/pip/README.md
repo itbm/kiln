@@ -58,9 +58,14 @@ renders him as a single still frame.
 Two kinds, both registered in `actions/index.ts`:
 
 - **Mode** — owns Pip exclusively while active (patrol, pull-ups, the
-  drawer hit). Implement `PipAction` (`update`, optional `draw`/`pose`),
-  add it to `byMode`, and give something a way to enter it (a new perch
-  zone in `anchors.ts`, a bus event, …).
+  drawer hit). Implement `PipAction` (`update`, optional
+  `draw`/`pose`/`drawFront`/`exit`), add it to `byMode`, and give
+  something a way to enter it (a new perch zone in `anchors.ts`, a bus
+  event, …). Drawing is layered: `draw` renders **behind** him (scenery —
+  the pull-up bar, a target board, clouds), `drawFront` renders **over**
+  him and is for things he holds — set `pose.grip`/`gripB` so his arms
+  reach the handle, then draw the tool + closed hand in his transformed
+  unit space (the builder's toolkit in `build.ts` is the template).
 - **Ring act** — a short performance on the home-screen ring. Implement
   `RingAct` and append it to `ringActs`; the rest action picks one by
   weight when Pip is loitering on the ring. `axe-throw.ts` is the

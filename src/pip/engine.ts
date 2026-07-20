@@ -444,6 +444,8 @@ export class PipEngine {
       effort: 0,
       walkPh: null,
       windup: 0,
+      grip: null,
+      gripB: null,
     })
   }
 
@@ -707,8 +709,12 @@ export class PipEngine {
       effort: this.mode === "pullup" ? this.puEffort : 0,
       walkPh: this.mode === "walk" && this.walkPause <= 0 ? this.walkPh : null,
       windup: this.windup,
+      grip: null,
+      gripB: null,
     }
     action.pose?.(pose, t)
     drawPip(c, this.PAL, this.dark, t, pose)
+    /* front layer: things he holds draw over him (see PipAction.drawFront) */
+    action.drawFront?.(t, pose)
   }
 }
