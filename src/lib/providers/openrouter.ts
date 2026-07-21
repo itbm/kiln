@@ -11,8 +11,15 @@ import { cleanKey } from "@/lib/utils"
 const BASE = "https://openrouter.ai/api/v1"
 
 function headers(): Record<string, string> {
+  const key = cleanKey(getSettings().openrouterKey)
+  // never send an empty bearer: OpenRouter answers it with a baffling
+  // "Missing Authentication header" 401 — fail with a useful message instead
+  if (!key)
+    throw new Error(
+      "No OpenRouter API key configured — add one in Settings → Providers",
+    )
   return {
-    Authorization: `Bearer ${cleanKey(getSettings().openrouterKey)}`,
+    Authorization: `Bearer ${key}`,
     "Content-Type": "application/json",
     "HTTP-Referer": "https://github.com/itbm/mobile-ai-pwa",
     "X-Title": "Kiln",
@@ -54,9 +61,14 @@ export async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
 }
 
 export async function checkOpenRouterKey(key: string): Promise<string> {
+  const k = cleanKey(key)
+  if (!k)
+    throw new Error(
+      "the field only holds whitespace or invisible characters — copy the key from openrouter.ai again",
+    )
   // GET /key is the documented key-info endpoint (/auth/key is legacy)
   const res = await fetch(`${BASE}/key`, {
-    headers: { Authorization: `Bearer ${cleanKey(key)}` },
+    headers: { Authorization: `Bearer ${k}` },
   })
   if (!res.ok) {
     let msg = `Invalid key (HTTP ${res.status})`
@@ -66,7 +78,9 @@ export async function checkOpenRouterKey(key: string): Promise<string> {
     } catch {
       /* keep generic message */
     }
-    throw new Error(msg)
+    // say what was actually sent, so an unparseable-token 401 ("Missing
+    // Authentication header") is diagnosable from the toast alone
+    throw new Error(`${msg} — tested key “${k.slice(0, 9)}…”, ${k.length} chars`)
   }
   const json = await res.json()
   return json.data?.label ?? "OK"
