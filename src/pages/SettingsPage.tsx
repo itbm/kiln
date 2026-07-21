@@ -17,6 +17,7 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   ServerIcon,
   SparklesIcon,
   SunIcon,
@@ -46,6 +47,7 @@ import { ensureNotificationPermission } from "@/lib/notify"
 import {
   applyUpdate,
   checkForUpdates,
+  reloginViaProxy,
   useSWUpdate,
   type UpdateCheckResult,
 } from "@/lib/sw"
@@ -330,6 +332,7 @@ const UPDATE_CHECK_MESSAGES: Record<
 > = {
   "up-to-date": "You're on the latest version.",
   offline: "Couldn't check — you appear to be offline.",
+  "auth-expired": "Your login session seems to have expired.",
   unavailable: "Update checks aren't available in this browser.",
 }
 
@@ -378,9 +381,28 @@ function UpdatesSection() {
             )}
             {checking ? "Checking…" : "Check for updates"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.reload()}
+          >
+            <RotateCcwIcon />
+            Reload app
+          </Button>
           {checkResult && checkResult !== "update-ready" && (
             <span className="text-[12px] text-muted-foreground">
               {UPDATE_CHECK_MESSAGES[checkResult]}
+              {checkResult === "auth-expired" && (
+                <>
+                  {" "}
+                  <button
+                    className="underline underline-offset-2 hover:text-foreground"
+                    onClick={() => reloginViaProxy()}
+                  >
+                    Log in again
+                  </button>
+                </>
+              )}
             </span>
           )}
         </div>

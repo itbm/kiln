@@ -67,7 +67,18 @@ export default defineConfig({
         globIgnores: ["splash/**"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/splash\//],
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/splash\//,
+          // Same-origin login pages of common auth gateways (oauth2-proxy,
+          // traefik-forward-auth, Authentik, Pomerium). The re-login bounce
+          // (src/lib/sw.ts) redirects through them; serving the cached app
+          // shell instead of the gateway's page would break the login flow.
+          /^\/oauth2\//,
+          /^\/_oauth/,
+          /^\/outpost\.goauthentik\.io\//,
+          /^\/\.pomerium\//,
+        ],
         cleanupOutdatedCaches: true,
       },
     }),
