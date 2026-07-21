@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom"
 import { Toaster } from "@/components/ui/sonner"
 import { DialogHost } from "@/stores/dialogs"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
@@ -51,6 +51,9 @@ export default function App() {
         <Route path="/images/:chatId" element={<ImagesPage />} />
         <Route path="/artefacts" element={<ArtefactsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        {/* Return leg of the auth-proxy re-login bounce (src/lib/sw.ts) on
+            hosts that serve the SPA fallback instead of nginx's redirect. */}
+        <Route path="/api/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<ChatPage />} />
       </Routes>
       <Toaster position="top-center" theme={isDark ? "dark" : "light"} />
