@@ -308,6 +308,23 @@ await page.getByText("You're on the latest version.").waitFor({ timeout: 15000 }
 console.log("ok: manual update check reports up to date")
 await page.screenshot({ path: "shots/e2e-update-check.png" })
 
+// --- key hygiene: a quoted .env-style paste is sanitised on input ---
+// (a quoted key reaches OpenRouter as `Bearer "sk-…"`, which 401s with a
+// baffling "Missing Authentication header")
+await page.route("**/openrouter.ai/api/v1/models", (route) =>
+  route.fulfill({ status: 200, contentType: "application/json", body: '{"data":[]}' }),
+)
+const orKeyField = page.locator('input[type="password"]').first()
+await orKeyField.fill('OPENROUTER_API_KEY="sk-or-v1-e2e-paste"')
+await page.waitForTimeout(200)
+const storedKey = await page.evaluate(
+  () => JSON.parse(localStorage.getItem("amber-settings") ?? "{}").state?.openrouterKey,
+)
+if (storedKey !== "sk-or-v1-e2e-paste") {
+  console.error(`ASSERT FAIL: pasted key not sanitised (got ${JSON.stringify(storedKey)})`)
+  process.exitCode = 1
+} else console.log("ok: quoted .env paste sanitised to the bare key")
+
 // request shape checks
 const first = bodies[0]
 const assertTrue = (cond, msg) => {

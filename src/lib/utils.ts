@@ -10,13 +10,22 @@ export function uid(): string {
 }
 
 /**
- * API keys never contain whitespace, so strip it everywhere — not just the
+ * API keys never contain whitespace or quotes, so strip them everywhere — not just the
  * ends. Keys pasted from email/notes pick up interior line-wrap spaces
  * (silent 401s), and copies from rendered HTML pick up zero-width characters
- * that make fetch() reject the Authorization header outright.
+ * that make fetch() reject the Authorization header outright. Copies from
+ * .env/JSON/curl snippets arrive wrapped in quotes or brackets — which
+ * OpenRouter answers with a baffling "Missing Authentication header" 401 —
+ * so quote-ish characters go too, and a pasted `export KEY=` /
+ * `Authorization: Bearer` prefix is dropped.
  */
 export function cleanKey(raw: string): string {
-  return raw.replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, "")
+  return raw
+    .replace(
+      /^\s*["'`]?(?:export\s+)?(?:[A-Z][A-Z0-9_]*\s*=)?\s*["'`]?(?:Authorization\s*:)?\s*(?:Bearer\s+)?/i,
+      "",
+    )
+    .replace(/[\s\u200B-\u200D\u2060\uFEFF"'`\u201C\u201D\u2018\u2019<>,;]/g, "")
 }
 
 export function timeAgo(ts: number): string {
