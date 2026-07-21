@@ -11,7 +11,9 @@ He also feels the conversation. While he's on stage the system prompt
 asks the model to open every reply with a hidden `<emotion>…</emotion>`
 tag (see `src/lib/emotions.ts`); the stream watcher in `src/lib/engine.ts`
 hands it to `pip.emote()` the moment it completes, and `splitContent`
-strips it so users never see it. Quick feelings (happy, surprised, angry)
+strips it so users never see it. Some models drift into a bare
+`<thoughtful>`-style tag instead — both parsers tolerate that dialect at
+the start of a reply. Quick feelings (happy, surprised, angry)
 are pulses on his existing envelopes; lingering ones set a mood that
 colours everything for a while and then fades — mildly sad news banks his
 flame down, droops his brows and mouth and swaps his idle hops for sighs;

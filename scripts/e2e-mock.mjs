@@ -34,11 +34,15 @@ const round1 = sse([
   chunk({}, "tool_calls"),
 ])
 
-// Round 2: reasoning + prose + a markdown artifact
+// Round 2: reasoning + prose + a markdown artifact. The reply opens with a
+// bare mood tag (the "<thoughtful>" dialect some models use instead of the
+// <emotion> wrapper), split mid-tag to exercise the streaming partial-tag
+// handling — it must be consumed, never rendered as text.
 const round2 = sse([
   chunk({ reasoning: "The search results mention three roasters. " }),
   chunk({ reasoning: "I'll summarise and produce a short guide artifact." }),
-  chunk({ content: "Based on what I found, here's a quick guide:\n\n" }),
+  chunk({ content: "<thou" }),
+  chunk({ content: "ghtful>\nBased on what I found, here's a quick guide:\n\n" }),
   chunk({
     content:
       '<artifact identifier="espresso-guide" type="text/markdown" title="Espresso beans — quick guide">\n# Espresso beans\n\n',
@@ -176,6 +180,11 @@ await page.getByText("Espresso beans — quick guide").waitFor({ timeout: 10000 
 // generated title lands in the header
 await page.getByRole("heading", { name: "Espresso bean picks" }).waitFor({ timeout: 10000 })
 await page.waitForTimeout(400)
+// the bare mood tag must be consumed by the parser, never shown as text
+if (await page.getByText("<thoughtful>").count()) {
+  console.error("ASSERT FAIL: bare mood tag leaked into the chat")
+  process.exitCode = 1
+} else console.log("ok: bare mood tag stripped from the reply")
 await page.screenshot({ path: "shots/e2e-stream-result.png" })
 
 // artifact viewer opens with rendered markdown
@@ -189,6 +198,11 @@ await page.reload({ waitUntil: "networkidle" })
 await page.getByText("Searched “best espresso beans 2026”").waitFor({ timeout: 10000 })
 await page.getByText("Espresso beans — quick guide").waitFor({ timeout: 5000 })
 await page.getByText(/Thought for/).waitFor({ timeout: 5000 })
+// stored content is re-split at render time — still no mood-tag leak
+if (await page.getByText("<thoughtful>").count()) {
+  console.error("ASSERT FAIL: bare mood tag leaked after reload")
+  process.exitCode = 1
+} else console.log("ok: bare mood tag still hidden after reload")
 
 // --- regenerate keeps the old attempt as a version ---
 await page.getByLabel("Regenerate").click()

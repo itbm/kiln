@@ -1,4 +1,5 @@
 import { parseQuestionsInner, type QuestionsBlock } from "./questions"
+import { BARE_EMOTION_RE, PIP_EMOTIONS } from "./emotions"
 
 export type ArtifactType =
   | "text/markdown"
@@ -79,6 +80,23 @@ export function splitContent(raw: string): ContentSegment[] {
   let rest = raw
   let index = 0
 
+  /* Bare-mood dialect ("<thoughtful>" instead of the <emotion> wrapper):
+     consume any such tags opening the reply, plus a closing twin of the
+     same mood at the very end. findEmotion honours the same head form, so
+     Pip still gets the mood. */
+  let headMood: string | null = null
+  let bare = BARE_EMOTION_RE.exec(rest)
+  while (bare) {
+    headMood ??= bare[1].toLowerCase()
+    rest = rest.slice(bare[0].length)
+    bare = BARE_EMOTION_RE.exec(rest)
+  }
+  if (headMood)
+    rest = rest.replace(
+      new RegExp(`\\s*<\\s*/\\s*${headMood}\\s*>\\s*$`, "i"),
+      "",
+    )
+
   while (rest) {
     const fullA = FULL_RE.exec(rest)
     const fullQ = Q_FULL_RE.exec(rest)
@@ -156,13 +174,22 @@ export function splitContent(raw: string): ContentSegment[] {
         .replace(/^\//, "")
         .split(/[\s=]/)[0]
         .toLowerCase()
+      /* a bare mood tag may be being born too: at the head of the reply,
+         or its closing twin once a head mood was seen */
+      const moodTag =
+        segments.length === 0 && !rest.slice(0, lt).trim()
+          ? PIP_EMOTIONS.some((e) => e.startsWith(tail))
+          : headMood !== null &&
+            after.startsWith("/") &&
+            headMood.startsWith(tail)
       // a bare trailing "<" may be a tag being born; "< 3" is just maths
       if (
         (after === "" || tail !== "") &&
-        tail.length <= 9 &&
-        ("artifact".startsWith(tail) ||
-          "questions".startsWith(tail) ||
-          "emotion".startsWith(tail))
+        ((tail.length <= 9 &&
+          ("artifact".startsWith(tail) ||
+            "questions".startsWith(tail) ||
+            "emotion".startsWith(tail))) ||
+          moodTag)
       ) {
         pushText(rest.slice(0, lt))
         return segments
