@@ -78,6 +78,12 @@ export async function checkOpenRouterKey(key: string): Promise<string> {
     } catch {
       /* keep generic message */
     }
+    // "User not found." = the header parsed but the key isn't one
+    // OpenRouter currently knows: an incomplete copy, or a brand-new key
+    // that hasn't activated at their edge yet
+    if (/user not found/i.test(msg))
+      msg +=
+        " — OpenRouter doesn't recognise this key: check the whole key was copied; brand-new keys can take a moment to activate"
     // say what was actually sent, so an unparseable-token 401 ("Missing
     // Authentication header") is diagnosable from the toast alone
     throw new Error(`${msg} — tested key “${k.slice(0, 9)}…”, ${k.length} chars`)
