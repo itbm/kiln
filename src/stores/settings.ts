@@ -110,5 +110,16 @@ export const useSettings = create<SettingsState>()(
   ),
 )
 
+/* Each open copy of the app (installed PWA, browser tabs) holds its own
+   in-memory store. Without this, a key saved in one instance keeps its old
+   value in the others until they reload — key tests and chats there keep
+   using the stale key. The event only fires in the instances that didn't
+   write, so the writer is never disturbed. */
+if (typeof window !== "undefined")
+  window.addEventListener("storage", (e) => {
+    if (!e.key || e.key === "amber-settings")
+      void useSettings.persist.rehydrate()
+  })
+
 /** Non-reactive snapshot for use outside React */
 export const getSettings = () => useSettings.getState()
