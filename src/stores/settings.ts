@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { DEFAULT_THEME_ID } from "@/lib/themes"
 import type { Effort, ModelRef, Skill } from "@/lib/types"
-import { uid } from "@/lib/utils"
+import { cleanKey, uid } from "@/lib/utils"
 
 export type ThemePref = "system" | "light" | "dark"
 
@@ -94,9 +94,32 @@ export const useSettings = create<SettingsState>()(
             : [...st.favoriteModels, key],
         })),
     }),
-    { name: "amber-settings" },
+    {
+      name: "amber-settings",
+      version: 1,
+      // v1: keys saved before cleanKey handled quotes/prefixes (or via old
+      // builds that stored raw input) get sanitised once on load, so a
+      // whitespace-only or quote-wrapped key can't linger as "configured"
+      migrate: (persisted) => {
+        const st = persisted as Record<string, unknown>
+        for (const f of ["openrouterKey", "ollamaKey", "tavilyKey"] as const)
+          if (typeof st[f] === "string") st[f] = cleanKey(st[f] as string)
+        return st
+      },
+    },
   ),
 )
+
+/* Each open copy of the app (installed PWA, browser tabs) holds its own
+   in-memory store. Without this, a key saved in one instance keeps its old
+   value in the others until they reload — key tests and chats there keep
+   using the stale key. The event only fires in the instances that didn't
+   write, so the writer is never disturbed. */
+if (typeof window !== "undefined")
+  window.addEventListener("storage", (e) => {
+    if (!e.key || e.key === "amber-settings")
+      void useSettings.persist.rehydrate()
+  })
 
 /** Non-reactive snapshot for use outside React */
 export const getSettings = () => useSettings.getState()

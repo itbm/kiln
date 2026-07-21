@@ -15,8 +15,11 @@ function base(): string {
 }
 
 function headers(): Record<string, string> {
+  // a keyless LAN Ollama is a legitimate setup — omit the header rather
+  // than send an empty bearer
+  const key = cleanKey(getSettings().ollamaKey)
   return {
-    Authorization: `Bearer ${cleanKey(getSettings().ollamaKey)}`,
+    ...(key ? { Authorization: `Bearer ${key}` } : {}),
     "Content-Type": "application/json",
   }
 }
@@ -25,8 +28,9 @@ export async function checkOllamaKey(
   key: string,
   baseUrl: string,
 ): Promise<string> {
+  const k = cleanKey(key)
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/tags`, {
-    headers: { Authorization: `Bearer ${cleanKey(key)}` },
+    headers: k ? { Authorization: `Bearer ${k}` } : {},
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json = await res.json()
