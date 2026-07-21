@@ -58,6 +58,15 @@ export class PipEngine {
   anger = 0
   angerHold = 0
   rage = 0
+  /* mood set by the reply's hidden <emotion> tag (see bus.emote):
+     "sad" | "worried" | "excited" | "thoughtful", "" = neutral */
+  mood = ""
+  moodK = 0
+  moodT = 0
+  sadK = 0
+  tearK = 0
+  excK = 0
+  surpT = -1
   gazeX = 0
   gazeY = 0
   wanderX = 0
@@ -282,24 +291,99 @@ export class PipEngine {
     const S = this.S0
     const r = rectOfEl(document.querySelector('[data-pip-spot="composer"]'))
     const calm = !document.querySelector('[data-pip-spot="ring"]')
+    /* a gloomy reply gets a quiet landing, not a wave and confetti */
+    const glum = this.sadK > 0.4
     if (r)
       this.startDart({
         id: "composer",
         ride: true,
         s: calm ? 0.8 : 0.9,
-        happy: true,
+        happy: !glum,
         home: calm,
         calm,
         w: 1,
         x: r.right - S * 0.8,
         y: r.top - S * 0.5,
       })
-    this.flareV = 3
-    for (let i = 0; i < 6; i++) this.drops.spawn(this.px, this.py, true)
+    this.flareV = glum ? 1.4 : 3
+    const sparks = glum ? 0 : 6
+    for (let i = 0; i < sparks; i++) this.drops.spawn(this.px, this.py, true)
   }
 
   flareUp() {
     this.flareV = 3
+  }
+
+  /**
+   * The reply's hidden <emotion> tag (see src/lib/emotions.ts). Quick
+   * feelings (happy, surprised…) are pulses on the existing envelopes;
+   * lingering ones (sad, worried, excited, thoughtful) set a mood that
+   * colours everything until it fades or the next reply replaces it.
+   */
+  emote(kind: string) {
+    if (this.reduceMotion) {
+      this.renderOnce()
+      return
+    }
+    this.mood = ""
+    this.moodK = 0
+    this.moodT = 0
+    const resting = this.mode === "rest" && this.act === ""
+    switch (kind) {
+      case "happy":
+        this.gigPulse = Math.max(this.gigPulse, 1.6)
+        this.flareV = 2.6
+        break
+      case "excited":
+        this.mood = "excited"
+        this.moodK = 1
+        this.moodT = 22
+        this.gigPulse = Math.max(this.gigPulse, 2)
+        this.flareV = 3.4
+        if (resting) {
+          this.antic = "hop"
+          this.anticT = 0
+        }
+        for (let i = 0; i < 8; i++)
+          this.drops.spawn(this.px, this.py - this.Sc * 0.6, true)
+        break
+      case "thoughtful":
+        this.mood = "thoughtful"
+        this.moodK = 1
+        this.moodT = 25
+        break
+      case "worried":
+        this.mood = "worried"
+        this.moodK = 1
+        this.moodT = 30
+        break
+      case "sad":
+        this.mood = "sad"
+        this.moodK = 0.62
+        this.moodT = 45
+        break
+      case "crying":
+        this.mood = "sad"
+        this.moodK = 1
+        this.moodT = 45
+        break
+      case "surprised":
+        this.surpT = 0
+        this.flareV = 3
+        if (resting) {
+          this.antic = "hop"
+          this.anticT = 0
+        }
+        break
+      case "angry":
+        this.anger = Math.max(this.anger, 0.8)
+        this.angerHold = 3
+        this.flareV = 3
+        break
+      default:
+        /* neutral (or an unknown mood) gently clears the slate */
+        break
+    }
   }
 
   drawerOpening() {
@@ -437,6 +521,8 @@ export class PipEngine {
       velX: 0,
       angry: 0,
       rage: 0,
+      sad: 0,
+      tears: 0,
       jet: 0,
       push: false,
       pull: null,
@@ -507,6 +593,37 @@ export class PipEngine {
         55,
       )
 
+    /* moods (from the reply's <emotion> tag) linger, then fade */
+    if (this.moodT > 0) {
+      this.moodT -= dt
+      if (this.moodT <= 0) {
+        this.mood = ""
+        this.moodK = 0
+      }
+    }
+    const sadTgt =
+      this.mood === "sad" ? this.moodK : this.mood === "worried" ? 0.32 : 0
+    this.sadK += (sadTgt - this.sadK) * (1 - Math.pow(0.05, dt))
+    const tearTgt = this.mood === "sad" && this.moodK > 0.85 ? 1 : 0
+    this.tearK +=
+      (tearTgt - this.tearK) * (1 - Math.pow(tearTgt ? 0.01 : 0.08, dt))
+    this.excK +=
+      ((this.mood === "excited" ? this.moodK : 0) - this.excK) *
+      (1 - Math.pow(0.02, dt))
+    if (this.surpT >= 0) {
+      this.surpT += dt
+      if (this.surpT > 1.1) this.surpT = -1
+    }
+    /* crying: tears dribble from the eyes */
+    if (this.tearK > 0.3 && Math.random() < dt * (1 + this.tearK * 2.2)) {
+      const side = Math.random() < 0.5 ? -1 : 1
+      this.drops.tear(
+        this.px + side * Sc * 0.16,
+        this.py + Sc * 0.1,
+        this.PAL.sweat,
+      )
+    }
+
     /* ============ mode machine (see src/pip/actions) ============ */
     const action = this.actions.byMode[this.mode] ?? this.actions.byMode.rest
     action.update(dt, t)
@@ -550,11 +667,11 @@ export class PipEngine {
     this.shy += (shyTgt - this.shy) * (1 - Math.pow(0.02, dt))
     this.gigPulse = Math.max(0, this.gigPulse - dt)
     const gigTgt =
-      this.antic === "giggle" ||
+      (this.antic === "giggle" ||
       this.gigPulse > 0 ||
       (this.near && !this.veryNear && !busyMode && this.anger < 0.3)
         ? 1
-        : 0
+        : 0) * (1 - this.sadK * 0.85) /* no giggling through the gloom */
     this.giggle += (gigTgt - this.giggle) * (1 - Math.pow(0.008, dt))
 
     if (
@@ -566,23 +683,36 @@ export class PipEngine {
     ) {
       this.anticNext -= dt
       if (this.anticT < 0 && this.anticNext <= 0) {
-        this.antic = ["giggle", "look", "flare", "hop"][
-          Math.floor(Math.random() * 4)
-        ]
+        this.antic =
+          this.sadK > 0.45
+            ? /* blue Pip doesn't hop about — he sighs and stares */
+              Math.random() < 0.65
+              ? "sigh"
+              : "look"
+            : ["giggle", "look", "flare", "hop"][Math.floor(Math.random() * 4)]
         this.anticT = 0
         this.anticNext = 4 + Math.random() * 4
         if (this.antic === "flare") this.flareV = 3.2
+        if (this.antic === "sigh") this.flareV = -1.6 /* the flame slumps */
       }
     }
     if (this.anticT >= 0) {
+      const wasT = this.anticT
       this.anticT += dt
-      if (this.anticT > (this.antic === "giggle" ? 1.3 : 0.9)) {
+      if (this.antic === "sigh" && wasT < 0.55 && this.anticT >= 0.55)
+        this.drops.spawn(this.px, this.py - Sc * 1.2, false, this.PAL.smoke, 32)
+      if (
+        this.anticT >
+        (this.antic === "giggle" ? 1.3 : this.antic === "sigh" ? 1.5 : 0.9)
+      ) {
         this.anticT = -1
         this.antic = ""
       }
     }
 
-    this.flareV += (1 - this.flare) * 10 * dt - this.flareV * 4 * dt
+    /* sadness banks the flame down; excitement stokes it */
+    const flareBase = 1 - this.sadK * 0.24 + this.excK * 0.1
+    this.flareV += (flareBase - this.flare) * 10 * dt - this.flareV * 4 * dt
     this.flare += this.flareV * dt
     const jetTgt = this.mode === "jet" || this.mode === "push" ? 1 : 0
     this.jetK +=
@@ -608,6 +738,18 @@ export class PipEngine {
       lx = -0.9 * this.face
       ly = 0.05
     }
+    if (this.mode !== "push" && this.mode !== "build") {
+      if (this.mood === "thoughtful") {
+        /* eyes drift up and aside, pondering */
+        lx = lx * 0.35 + this.face * 0.4
+        ly = Math.min(ly, -0.5)
+      }
+      if (this.sadK > 0.05) {
+        /* downcast */
+        lx *= 1 - this.sadK * 0.55
+        ly += this.sadK * 0.6
+      }
+    }
     if (this.mode === "push") {
       lx = 0.8
       ly = 0.1
@@ -623,7 +765,8 @@ export class PipEngine {
     let lid = 1
     if (this.blinkNext <= 0 && this.blinkT < 0) {
       this.blinkT = 0
-      this.blinkNext = 2 + Math.random() * 3
+      this.blinkNext =
+        (2 + Math.random() * 3) * (this.mood === "thoughtful" ? 1.5 : 1)
     }
     if (this.blinkT >= 0) {
       this.blinkT += dt
@@ -639,7 +782,8 @@ export class PipEngine {
     let bob = 0
     if (this.mode === "rest")
       bob =
-        Math.sin(t * 2.1) * 0.028 +
+        Math.sin(t * 2.1) * 0.028 * (1 - this.sadK * 0.5) +
+        this.excK * Math.abs(Math.sin(t * 4.4)) * 0.05 +
         (this.antic === "hop" && this.anticT >= 0
           ? Math.sin(clamp(this.anticT / 0.5, 0, 1) * 3.1416) * 0.16
           : 0)
@@ -653,8 +797,11 @@ export class PipEngine {
       sy *= 1 + this.puK * 0.06
       sx *= 1 - this.puK * 0.04
     }
+    /* sniffly shudder while crying */
+    if (this.tearK > 0.4) sy *= 1 + n1(t * 21) * 0.012 * this.tearK
     const shrink =
-      (1 - this.shy * 0.08 - this.hide * 0.05) * (1 + this.anger * 0.05)
+      (1 - this.shy * 0.08 - this.hide * 0.05 - this.sadK * 0.05) *
+      (1 + this.anger * 0.05)
     this.face += (this.faceT - this.face) * (1 - Math.pow(0.0008, dt))
     if (this.mode !== "hit") this.tiltO *= 1 - Math.min(1, dt * 3)
     let tilt =
@@ -698,10 +845,13 @@ export class PipEngine {
       startled:
         ((this.shy > 0.85 && this.giggle < 0.4) ||
           this.eepT >= 0 ||
+          (this.surpT >= 0 && this.surpT < 0.75) ||
           (this.mode === "hit" && this.hitT < 0.4)) &&
         this.anger < 0.5,
       angry: this.anger,
       rage: this.rage,
+      sad: this.sadK,
+      tears: this.tearK,
       jet: this.jetK,
       push: this.mode === "push",
       pull: null,

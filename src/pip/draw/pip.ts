@@ -382,19 +382,44 @@ export function drawPip(
     ctx.lineCap = "round"
     const braise = o.startled ? -0.06 : 0
     const bworry = o.shy * 0.03
+    /* sad brows: inner ends float up toward each other, outer ends sink */
+    const sIn = -(o.sad || 0) * 0.085
+    const sOut = (o.sad || 0) * 0.06
     ctx.beginPath()
-    ctx.moveTo(-ex - 0.09 + gx, -0.19 + braise + bworry + gy)
-    ctx.quadraticCurveTo(-ex + gx, -0.245 + braise + gy, -ex + 0.09 + gx, -0.2 + braise + gy)
+    ctx.moveTo(-ex - 0.09 + gx, -0.19 + braise + bworry + sOut + gy)
+    ctx.quadraticCurveTo(-ex + gx, -0.245 + braise + gy, -ex + 0.09 + gx, -0.2 + braise + sIn + gy)
     ctx.stroke()
     ctx.beginPath()
-    ctx.moveTo(ex - 0.09 + gx, -0.2 + braise + gy)
-    ctx.quadraticCurveTo(ex + gx, -0.245 + braise + gy, ex + 0.09 + gx, -0.19 + braise + bworry + gy)
+    ctx.moveTo(ex - 0.09 + gx, -0.2 + braise + sIn + gy)
+    ctx.quadraticCurveTo(ex + gx, -0.245 + braise + gy, ex + 0.09 + gx, -0.19 + braise + bworry + sOut + gy)
     ctx.stroke()
   }
-  const happyEyes = (o.giggle > 0.5 || (o.happy && o.shy < 0.3)) && A < 0.3
-  const lid = o.lid * (1 - A * 0.28) * (1 - (o.effort || 0) * 0.35)
+  const happyEyes =
+    (o.giggle > 0.5 || (o.happy && o.shy < 0.3)) && A < 0.3 && o.sad < 0.4
+  const lid =
+    o.lid * (1 - A * 0.28) * (1 - (o.effort || 0) * 0.35) * (1 - o.sad * 0.2)
   eye(ctx, pal, -ex + gx, eyY + gy, er, lid, happyEyes)
   eye(ctx, pal, ex + gx, eyY + gy, er, lid, happyEyes)
+  /* welling tears pooling along the lower lids */
+  if (o.tears > 0.12) {
+    ctx.globalAlpha = Math.min(1, o.tears) * 0.85
+    ctx.fillStyle = pal.sweat
+    const ty = eyY + gy + er * 0.74
+    const tr = er * (0.3 + 0.06 * n1(t * 5.3))
+    for (const s of [-1, 1]) {
+      ctx.beginPath()
+      ctx.ellipse(s * ex + gx, ty, tr, tr * 0.62, 0, 0, 6.2832)
+      ctx.fill()
+    }
+    ctx.fillStyle = "#fff"
+    ctx.globalAlpha = Math.min(1, o.tears) * 0.55
+    for (const s of [-1, 1]) {
+      ctx.beginPath()
+      ctx.arc(s * ex + gx - tr * 0.3, ty - tr * 0.2, tr * 0.24, 0, 6.2832)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+  }
   const bA = 0.3 + o.shy * 0.45 + o.giggle * 0.2 + A * 0.5 + (o.effort || 0) * 0.3
   ctx.globalAlpha = clamp(bA, 0, 0.9)
   ctx.fillStyle = pal.blush
@@ -438,6 +463,21 @@ export function drawPip(
     ctx.moveTo(-0.05, 0.2)
     ctx.lineTo(0.09, 0.2)
     ctx.stroke()
+  } else if (o.sad > 0.35 && o.giggle < 0.5) {
+    /* downturned mouth; it quivers when the tears are flowing */
+    ctx.strokeStyle = pal.eye
+    ctx.lineWidth = 0.034
+    ctx.lineCap = "round"
+    const quiver = o.tears > 0.4 ? n1(t * 13) * 0.008 * o.tears : 0
+    ctx.beginPath()
+    ctx.arc(
+      0.02,
+      0.245 + quiver,
+      0.055 + o.sad * 0.012,
+      Math.PI + 0.4,
+      Math.PI * 2 - 0.4,
+    )
+    ctx.stroke()
   } else if (o.giggle < 0.5) {
     ctx.strokeStyle = pal.eye
     ctx.lineWidth = 0.034
@@ -456,7 +496,7 @@ export function drawPip(
   } else if (o.push) {
     armStroke(ctx, -0.08, 0.16, 0.58, 0.06, 0.06, C_out, C_lmb)
     armStroke(ctx, 0.34, 0.24, 0.6, 0.3, 0.1, C_out, C_lmb)
-  } else if (o.jet > 0.4) {
+  } else if (o.jet > 0.4 && !o.grip && !o.gripB) {
     armStroke(ctx, -0.4, 0.2, -0.45, 0.5, -0.14, C_out, C_lmb)
     armStroke(ctx, 0.4, 0.2, 0.5, 0.44, 0.14, C_out, C_lmb)
   } else {

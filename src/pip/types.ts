@@ -47,6 +47,10 @@ export interface PipPose {
   velX: number
   angry: number
   rage: number
+  /** sadness envelope 0..1 — droopy brows, downturned mouth, heavy lids */
+  sad: number
+  /** crying envelope 0..1 — welling eyes (the engine adds falling tears) */
+  tears: number
   jet: number
   push: boolean
   pull: { grip: number } | null
