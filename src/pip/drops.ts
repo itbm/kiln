@@ -29,14 +29,15 @@ export class Drops {
     })
   }
 
-  /** a tear: everything else drifts up like flame — tears dribble DOWN */
+  /** a tear: everything else drifts up like flame — tears dribble DOWN.
+      Sized to read at a glance even when Pip perches small on the ledge. */
   tear(x: number, y: number, col: string) {
     this.drops.push({
       x: x + (Math.random() - 0.5) * 3,
       y,
       vx: (Math.random() - 0.5) * 8,
       vy: 26 + Math.random() * 30,
-      r: 1.6 + Math.random() * 1.6,
+      r: 2 + Math.random() * 1.8,
       life: 1,
       rate: 1 / (0.6 + Math.random() * 0.4),
       col,

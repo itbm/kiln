@@ -50,7 +50,13 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   A meter pill appears at 60% usage for one-tap compaction.
 - **Slash commands** — type `/` in the composer: `/compact [focus]`,
   `/clear` (fresh context, messages kept), `/title`, `/model`, `/effort`,
-  `/export`, `/help`.
+  `/export`, `/stats`, `/help`.
+- **Usage & cost** — every reply records what the provider actually
+  reported, never an estimate: tokens in/out (with cached and reasoning
+  splits), the exact credits charged on OpenRouter, and generation speed
+  on Ollama. A quiet readout under each reply expands on tap, and
+  **Usage & cost** in the chat menu (or `/stats`) totals the whole chat —
+  regenerated attempts included, per model.
 - **Message editing & versions** — edit any of your messages and resend
   (later messages are replaced after a confirm); regenerating a reply keeps
   every attempt with a Claude-style ‹ 1/2 › version switcher, including
@@ -115,8 +121,9 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   under the header, gets clobbered by the opening sidebar and jetpacks
   over to shove it shut. He reacts to the conversation's mood too: while
   he's enabled, replies open with a hidden `<emotion>` tag (stripped
-  before display) that he acts on — sighs and drooping brows for sad
-  news, actual tears for heartbreaking news, bouncing for exciting news.
+  before display) that he acts on — sighs, drooping brows and welling
+  tears for sad news, full streaming tears for heartbreaking news,
+  bouncing for exciting news.
   While an artefact streams in he dons a hard hat and plays builder on
   its card, cycling hammer, saw and drill as the job drags on — and past
   30 seconds he jetpacks the card up to the top of the screen and

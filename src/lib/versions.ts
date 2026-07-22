@@ -15,6 +15,7 @@ export function snapshotGeneration(msg: Message): Generation {
     status: msg.status,
     error: msg.error,
     createdAt: msg.createdAt,
+    usage: msg.usage,
   }
 }
 
@@ -49,6 +50,7 @@ export function switchToVersion(msg: Message, target: number): Message {
     steps: chosen.steps,
     images: chosen.images,
     error: chosen.error,
+    usage: chosen.usage,
     versions: rest,
     versionIndex: clamped,
   }
@@ -69,6 +71,7 @@ export function beginNewVersion(msg: Message): Message {
     steps: undefined,
     images: undefined,
     error: undefined,
+    usage: undefined,
     status: "pending",
     versions,
     versionIndex: versions.length,

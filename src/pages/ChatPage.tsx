@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
+  ChartColumnIcon,
   CloudUploadIcon,
   DownloadIcon,
   GhostIcon,
@@ -18,6 +19,7 @@ import { Composer } from "@/components/chat/Composer"
 import { MessageView } from "@/components/chat/MessageView"
 import { ArtifactViewer } from "@/components/chat/ArtifactView"
 import { QuestionsSheet } from "@/components/chat/QuestionsSheet"
+import { UsageStatsDialog } from "@/components/chat/UsageStatsDialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -137,6 +139,7 @@ export default function ChatPage() {
   const [pendingTemp, setPendingTemp] = useState(false)
   const [pendingSkills, setPendingSkills] = useState<string[]>(defaultSkillIds)
   const [artifact, setArtifact] = useState<ArtifactBlock | null>(null)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [questionsFor, setQuestionsFor] = useState<{
     msg: Message
     block: QuestionsBlock
@@ -332,6 +335,9 @@ export default function ChatPage() {
       case "export":
         void exportChatFile(chat)
         break
+      case "stats":
+        setStatsOpen(true)
+        break
     }
   }
 
@@ -421,6 +427,9 @@ export default function ChatPage() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => void renameChat()}>
                       <PencilIcon /> Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStatsOpen(true)}>
+                      <ChartColumnIcon /> Usage & cost
                     </DropdownMenuItem>
                     {chat.temporary ? (
                       <DropdownMenuItem
@@ -561,6 +570,14 @@ export default function ChatPage() {
           )}
 
           <ArtifactViewer artifact={artifact} onClose={() => setArtifact(null)} />
+          {chat && (
+            <UsageStatsDialog
+              open={statsOpen}
+              onOpenChange={setStatsOpen}
+              chat={chat}
+              messages={messages}
+            />
+          )}
           {questionsFor && (
             <QuestionsSheet
               open

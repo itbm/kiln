@@ -11,9 +11,10 @@ const sse = (events) =>
   events.map((e) => `data: ${JSON.stringify(e)}`).join("\n\n") +
   "\n\ndata: [DONE]\n\n"
 
-const chunk = (delta, finish = null) => ({
+const chunk = (delta, finish = null, usage = null) => ({
   id: "gen-1",
   choices: [{ delta, finish_reason: finish }],
+  ...(usage ? { usage } : {}),
 })
 
 // Round 1: model asks for a web search
@@ -31,7 +32,11 @@ const round1 = sse([
   chunk({
     tool_calls: [{ index: 0, function: { arguments: 'resso beans 2026"}' } }],
   }),
-  chunk({}, "tool_calls"),
+  chunk({}, "tool_calls", {
+    prompt_tokens: 412,
+    completion_tokens: 24,
+    cost: 0.0016,
+  }),
 ])
 
 // Round 2: reasoning + prose + a markdown artifact. The reply opens with a
@@ -49,7 +54,13 @@ const round2 = sse([
   }),
   chunk({ content: "- **Fresh roast date** beats brand\n- Medium-dark for milk drinks\n" }),
   chunk({ content: "</artifact>\n\nWant tasting notes for any of these?" }),
-  chunk({}, "stop"),
+  chunk({}, "stop", {
+    prompt_tokens: 655,
+    completion_tokens: 128,
+    cost: 0.0024,
+    prompt_tokens_details: { cached_tokens: 300 },
+    completion_tokens_details: { reasoning_tokens: 22 },
+  }),
 ])
 
 // Title call
@@ -59,6 +70,17 @@ const titleResp = sse([chunk({ content: "Espresso bean picks" }), chunk({}, "sto
 const summaryResp = sse([
   chunk({ content: "- User wants espresso bean advice; fresh roast date matters most" }),
   chunk({}, "stop"),
+])
+
+// Sad-mood reply — the wrapped <emotion> tag split mid-stream; Pip must
+// well up (tears are the only blue he ever wears) and the tag never renders
+const sadResp = sse([
+  chunk({ content: "<emo" }),
+  chunk({
+    content:
+      "tion>sad</emotion>I'm sorry — that's genuinely sad news. Take a moment; I'm right here.",
+  }),
+  chunk({}, "stop", { prompt_tokens: 40, completion_tokens: 18, cost: 0.0002 }),
 ])
 
 // Interactive questions reply — split across chunks mid-tag to exercise
@@ -137,6 +159,9 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
   const asksQuestions =
     typeof lastUser?.content === "string" &&
     lastUser.content.includes("Ask me setup questions")
+  const isSadNews =
+    typeof lastUser?.content === "string" &&
+    lastUser.content.includes("sad news")
   const hasToolResult = body.messages?.some((m) => m.role === "tool")
   const payload = isTitle
     ? titleResp
@@ -144,9 +169,11 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
       ? summaryResp
       : asksQuestions
         ? questionsResp
-        : hasToolResult
-          ? round2
-          : round1
+        : isSadNews
+          ? sadResp
+          : hasToolResult
+            ? round2
+            : round1
   await route.fulfill({
     status: 200,
     headers: { "content-type": "text/event-stream" },
@@ -170,6 +197,31 @@ const errors = []
 page.on("pageerror", (e) => errors.push(e.message))
 
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
+
+// --- Pip stays on screen when the opening sidebar clobbers him ---
+// He idles on the home ring (screen centre), squarely in the drawer's
+// path. Open it, let the knock-and-bounce physics fully settle, then
+// count his opaque pixels: a ricochet must never carry him off-screen
+// (the old single-wall bounce could leave him resting at negative x).
+await page.waitForTimeout(1000)
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(4500)
+const pipPixels = await page.evaluate(() => {
+  const cv = document.querySelector("canvas[aria-hidden]")
+  const g = cv?.getContext("2d")
+  if (!cv || !g) return -1
+  const data = g.getImageData(0, 0, cv.width, cv.height).data
+  let n = 0
+  for (let i = 3; i < data.length; i += 4) if (data[i] > 50) n++
+  return n
+})
+if (pipPixels < 800) {
+  console.error(`ASSERT FAIL: Pip off-screen after sidebar knock (${pipPixels} visible px)`)
+  process.exitCode = 1
+} else console.log(`ok: Pip visible after the sidebar knock (${pipPixels} px)`)
+await page.keyboard.press("Escape") // close the drawer (he shoves it shut)
+await page.waitForTimeout(600)
+
 await page.getByPlaceholder("Message Kiln…").fill("What espresso beans should I buy?")
 await page.getByLabel("Send").click()
 
@@ -185,6 +237,20 @@ if (await page.getByText("<thoughtful>").count()) {
   console.error("ASSERT FAIL: bare mood tag leaked into the chat")
   process.exitCode = 1
 } else console.log("ok: bare mood tag stripped from the reply")
+
+// --- usage caption: both tool rounds summed, cost from the provider ---
+// round1 ($0.0016) + round2 ($0.0024) = $0.004
+const usageBtn = page.getByText("$0.004", { exact: true })
+await usageBtn.waitFor({ timeout: 5000 })
+console.log("ok: usage caption shows summed provider cost")
+await usageBtn.click()
+const usageDetail = page.getByText(
+  "1.1k in (300 cached) · 152 out (22 reasoning) · $0.004",
+  { exact: true },
+)
+await usageDetail.waitFor({ timeout: 5000 })
+console.log("ok: caption expands to the full token breakdown")
+await usageDetail.click() // collapse again
 await page.screenshot({ path: "shots/e2e-stream-result.png" })
 
 // artifact viewer opens with rendered markdown
@@ -203,6 +269,9 @@ if (await page.getByText("<thoughtful>").count()) {
   console.error("ASSERT FAIL: bare mood tag leaked after reload")
   process.exitCode = 1
 } else console.log("ok: bare mood tag still hidden after reload")
+// usage survives the round-trip through IndexedDB
+await page.getByText("$0.004", { exact: true }).waitFor({ timeout: 5000 })
+console.log("ok: usage caption persists across reload")
 
 // --- regenerate keeps the old attempt as a version ---
 await page.getByLabel("Regenerate").click()
@@ -213,6 +282,18 @@ await page.getByLabel("Next version").click()
 await page.getByText("2/2").waitFor({ timeout: 5000 })
 console.log("ok: regenerate created version 2/2 and switcher works")
 await page.screenshot({ path: "shots/e2e-versions.png" })
+
+// --- /stats dialog: totals cover BOTH attempts of the regenerated reply ---
+await page.getByPlaceholder("Message Kiln…").fill("/stats")
+await page.getByLabel("Send").click()
+await page.getByText("1 (2 attempts)").waitFor({ timeout: 5000 })
+await page.getByText("2.1k (600 cached)").waitFor({ timeout: 5000 })
+await page.getByText("304 (44 reasoning)").waitFor({ timeout: 5000 })
+await page.getByText("$0.008", { exact: true }).waitFor({ timeout: 5000 })
+console.log("ok: /stats sums tokens and cost across attempts")
+await page.screenshot({ path: "shots/e2e-usage-stats.png" })
+await page.keyboard.press("Escape")
+await page.getByText("1 (2 attempts)").waitFor({ state: "detached", timeout: 5000 })
 
 // --- /help command ---
 await page.getByPlaceholder("Message Kiln…").fill("/help")
@@ -301,6 +382,35 @@ if (!compactionCall) {
   process.exitCode = 1
 }
 
+// --- sad mood: Pip visibly wells up (tears are his only blue paint) ---
+await page.getByPlaceholder("Message Kiln…").fill("I have some sad news to share")
+await page.getByLabel("Send").click()
+await page.getByText("Take a moment; I'm right here.").waitFor({ timeout: 15000 })
+if (await page.getByText("<emotion>sad").count()) {
+  console.error("ASSERT FAIL: wrapped emotion tag leaked into the chat")
+  process.exitCode = 1
+} else console.log("ok: wrapped emotion tag stripped from the sad reply")
+await page.waitForTimeout(1200) // tears well in over ~a second
+let tearPx = 0
+for (let i = 0; i < 8; i++) {
+  const n = await page.evaluate(() => {
+    const cv = document.querySelector("canvas[aria-hidden]")
+    const g = cv?.getContext("2d")
+    if (!cv || !g) return -1
+    const d = g.getImageData(0, 0, cv.width, cv.height).data
+    let count = 0
+    for (let i = 0; i < d.length; i += 4)
+      if (d[i + 3] > 120 && d[i + 2] > 180 && d[i + 2] > d[i] + 25) count++
+    return count
+  })
+  tearPx = Math.max(tearPx, n)
+  await page.waitForTimeout(350)
+}
+if (tearPx < 12) {
+  console.error(`ASSERT FAIL: no visible tears while sad (${tearPx} blue px)`)
+  process.exitCode = 1
+} else console.log(`ok: sad mood wells up visible tears (${tearPx} blue px)`)
+
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })
 await page.getByRole("button", { name: "Check for updates" }).click()
@@ -335,6 +445,7 @@ const assertTrue = (cond, msg) => {
 }
 assertTrue(first.model === "anthropic/claude-sonnet-4.5", "model id sent")
 assertTrue(first.stream === true, "stream requested")
+assertTrue(first.usage?.include === true, "usage accounting requested")
 assertTrue(first.messages[0].role === "system", "system prompt first")
 assertTrue(
   first.tools?.some((t) => t.function.name === "web_search"),

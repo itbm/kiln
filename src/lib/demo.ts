@@ -173,9 +173,11 @@ export async function seedDemo(): Promise<void> {
             effort: "auto",
             status: "done",
             createdAt: now - 0.62 * H,
+            usage: { promptTokens: 396, completionTokens: 58, genMs: 1900 },
           },
         ],
         versionIndex: 1,
+        usage: { promptTokens: 412, completionTokens: 642, genMs: 14600 },
         reasoning:
           "The user prefers walking, temples, food, quiet areas. Cluster geographically to minimise transit: Higashiyama day, Arashiyama day, north Kyoto (Kurama/Kibune) for autumn colour, downtown market day, and a flexible finale. Late October = early koyo in the hills, comfortable 12–20°C.",
         reasoningMs: 4200,
@@ -217,6 +219,7 @@ Want me to turn this into a printable itinerary with opening hours and walking d
       {
         role: "assistant",
         modelName: "glm-5.2",
+        usage: { promptTokens: 388, completionTokens: 2210, genMs: 51_000 },
         content: `Dark canvas, one loud red, and the terminal doing the selling — everything inline:
 
 <artifact identifier="strata-landing" type="text/html" title="Strata — Landing page">
@@ -380,6 +383,7 @@ One red on near-black, the gradient saved for the verb, and the terminal does th
         reasoning:
           "Mixed date formats: pandas to_datetime with format='mixed' handles US vs ISO if dayfirst is consistent... safer to try ISO first then fall back. Currency: strip symbols and thousands separators, cast to float, keep a currency column from the symbol.",
         reasoningMs: 11800,
+        usage: { promptTokens: 301, completionTokens: 512, genMs: 9800 },
         content: `Here's a script that handles both problems and keeps the original currency:
 
 <artifact identifier="clean-sales-csv" type="application/code" language="python" title="clean_sales.py">
@@ -424,6 +428,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
       {
         role: "assistant",
         modelName: "glm-5.2",
+        usage: { promptTokens: 348, completionTokens: 131, genMs: 3200 },
         content: `Happy to help — two choices shape everything else, so let me ask first:
 
 <questions>
@@ -472,6 +477,7 @@ Two things to check on your data: if any dates are day-first (UK style \`31/10/2
           { id: uid(), dataUrl: paintDemoImage(275, 210, "demo render") },
           { id: uid(), dataUrl: paintDemoImage(15, 320, "demo render") },
         ],
+        usage: { promptTokens: 24, completionTokens: 2580, cost: 0.0065 },
         status: "done",
         createdAt: now - 8 * H + 30_000,
       },

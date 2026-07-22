@@ -400,19 +400,20 @@ export function drawPip(
     o.lid * (1 - A * 0.28) * (1 - (o.effort || 0) * 0.35) * (1 - o.sad * 0.2)
   eye(ctx, pal, -ex + gx, eyY + gy, er, lid, happyEyes)
   eye(ctx, pal, ex + gx, eyY + gy, er, lid, happyEyes)
-  /* welling tears pooling along the lower lids */
+  /* welling tears pooling along the lower lids — they brighten and
+     swell with intensity so even quiet sadness reads at a glance */
   if (o.tears > 0.12) {
-    ctx.globalAlpha = Math.min(1, o.tears) * 0.85
+    ctx.globalAlpha = Math.min(1, o.tears * 1.6) * 0.85
     ctx.fillStyle = pal.sweat
     const ty = eyY + gy + er * 0.74
-    const tr = er * (0.3 + 0.06 * n1(t * 5.3))
+    const tr = er * (0.3 + 0.26 * Math.min(1, o.tears) + 0.06 * n1(t * 5.3))
     for (const s of [-1, 1]) {
       ctx.beginPath()
       ctx.ellipse(s * ex + gx, ty, tr, tr * 0.62, 0, 0, 6.2832)
       ctx.fill()
     }
     ctx.fillStyle = "#fff"
-    ctx.globalAlpha = Math.min(1, o.tears) * 0.55
+    ctx.globalAlpha = Math.min(1, o.tears * 1.6) * 0.55
     for (const s of [-1, 1]) {
       ctx.beginPath()
       ctx.arc(s * ex + gx - tr * 0.3, ty - tr * 0.2, tr * 0.24, 0, 6.2832)

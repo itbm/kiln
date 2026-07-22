@@ -46,6 +46,11 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     needsChat: true,
   },
   {
+    name: "stats",
+    description: "Show this chat's tokens & cost",
+    needsChat: true,
+  },
+  {
     name: "help",
     description: "List available commands",
     needsChat: false,

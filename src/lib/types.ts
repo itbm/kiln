@@ -33,6 +33,25 @@ export interface ModelInfo {
   pricing?: { prompt?: number; completion?: number }
 }
 
+/**
+ * Provider-reported usage for one generation. Token counts and cost come
+ * straight from the provider (OpenRouter usage accounting / Ollama eval
+ * counts) — never estimated. All fields optional: providers report what
+ * they know.
+ */
+export interface Usage {
+  promptTokens?: number
+  completionTokens?: number
+  /** subset of completionTokens spent on reasoning (OpenRouter) */
+  reasoningTokens?: number
+  /** subset of promptTokens served from the provider's cache (OpenRouter) */
+  cachedTokens?: number
+  /** USD actually charged (OpenRouter credits; absent for subscription/local providers) */
+  cost?: number
+  /** time spent generating output, ms (Ollama eval_duration, else wall clock) */
+  genMs?: number
+}
+
 export type ChatKind = "chat" | "image"
 
 export interface Chat {
@@ -105,6 +124,8 @@ export interface Message {
   error?: string
   createdAt: number
   editedAt?: number
+  /** provider-reported tokens/cost for the active generation */
+  usage?: Usage
   /** the user has submitted answers to this message's <questions> block */
   questionsAnswered?: boolean
   /** alternative generations (regenerations); active one lives on the message itself */
@@ -127,6 +148,7 @@ export interface Generation {
   status: MessageStatus
   error?: string
   createdAt: number
+  usage?: Usage
 }
 
 export interface Skill {
@@ -170,7 +192,7 @@ export type StreamEvent =
   | { type: "reasoning"; text: string }
   | { type: "image"; dataUrl: string }
   | { type: "tool_calls"; calls: WireToolCall[] }
-  | { type: "done"; finish?: string }
+  | { type: "done"; finish?: string; usage?: Usage }
 
 export interface ChatRequest {
   model: string
