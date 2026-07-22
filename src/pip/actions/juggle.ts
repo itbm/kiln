@@ -97,23 +97,25 @@ export class JuggleAct implements RingAct {
     this.actT += dt
     const Sc = e.Sc
     const period = 0.9 /* seconds per ember around the loop */
-    const handY = e.py - Sc * 0.5
-    const half = Sc * 0.33
-    const lift = Sc * 1.15
+    /* keep the whole cascade above his flame crown so every ember stays in
+       view — dip it into his body and two of the three vanish behind him */
+    const baseY = e.py - Sc * 1.6
+    const half = Sc * 0.55
+    const lift = Sc * 0.6
     const cx = e.px
     /* three embers on one shared loop, offset by a third: up-and-over on the
-       front half (the visible high arc), back low across on the rear half */
+       front half (the tall crossing arc), a shallow catch-across on the rear */
     for (let i = 0; i < 3; i++) {
       const s = (this.actT / period + i / 3) % 1
       const em = this.embers[i]
       if (s < 0.5) {
         const k = s / 0.5
         em.x = lerp(cx + half, cx - half, k)
-        em.y = handY - Math.sin(k * Math.PI) * lift
+        em.y = baseY - Math.sin(k * Math.PI) * lift
       } else {
         const k = (s - 0.5) / 0.5
         em.x = lerp(cx - half, cx + half, k)
-        em.y = handY + Math.sin(k * Math.PI) * Sc * 0.14
+        em.y = baseY + Math.sin(k * Math.PI) * Sc * 0.14
       }
     }
     /* his throwing hand bobs in time; a touch of body English */
