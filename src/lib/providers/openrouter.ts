@@ -2,6 +2,7 @@ import type {
   ChatRequest,
   ModelInfo,
   StreamEvent,
+  Usage,
   WireMessage,
   WireToolCall,
 } from "@/lib/types"
@@ -133,6 +134,9 @@ export async function* streamOpenRouter(
     model: req.model,
     messages: toApiMessages(req.messages),
     stream: true,
+    // usage accounting: the final stream chunk reports real token counts
+    // and the credits actually charged
+    usage: { include: true },
   }
   if (req.effort === "on") body.reasoning = { enabled: true }
   else if (req.effort === "off") body.reasoning = { enabled: false }
@@ -171,6 +175,7 @@ export async function* streamOpenRouter(
   let buf = ""
   const toolAcc = new Map<number, { id: string; name: string; args: string }>()
   let finish: string | undefined
+  let usage: Usage | undefined
 
   const flushToolCalls = (): WireToolCall[] =>
     [...toolAcc.entries()]
@@ -196,6 +201,26 @@ export async function* streamOpenRouter(
         continue
       }
       if (json.error) throw new Error(json.error.message ?? "Provider error")
+      // usage rides on the last chunk, whose choices array may be empty —
+      // grab it before the choice guard below
+      if (json.usage) {
+        const u = json.usage
+        // BYOK requests split billing: `cost` is OpenRouter's fee, the
+        // upstream provider's charge sits in cost_details
+        const upstream = u.cost_details?.upstream_inference_cost
+        const cost =
+          typeof u.cost === "number" || typeof upstream === "number"
+            ? (u.cost ?? 0) + (upstream ?? 0)
+            : undefined
+        usage = {
+          promptTokens: u.prompt_tokens ?? undefined,
+          completionTokens: u.completion_tokens ?? undefined,
+          reasoningTokens:
+            u.completion_tokens_details?.reasoning_tokens || undefined,
+          cachedTokens: u.prompt_tokens_details?.cached_tokens || undefined,
+          cost,
+        }
+      }
       const choice = json.choices?.[0]
       if (!choice) continue
       const delta = choice.delta ?? {}
@@ -221,5 +246,5 @@ export async function* streamOpenRouter(
 
   if (finish === "tool_calls" && toolAcc.size)
     yield { type: "tool_calls", calls: flushToolCalls() }
-  yield { type: "done", finish }
+  yield { type: "done", finish, usage }
 }

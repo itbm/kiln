@@ -85,6 +85,11 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
 - `src/lib/compact.ts`, `commands.ts`, `versions.ts`, `artifacts.ts`,
   `questions.ts` — context compaction, slash commands, response versions,
   artifact parsing, interactive `<questions>` blocks.
+- `src/lib/usage.ts` — provider-reported token/cost accounting: per-reply
+  `Message.usage` (captured by the engine from stream `done` events, one
+  per tool round), formatting, and per-chat totals. Usage is only ever
+  provider-reported, never estimated — the chars/4 heuristic in
+  `compact.ts` is for context budgeting only.
 - `deploy/nginx.conf` + `Dockerfile` + `compose.yaml` — hardened
   runtime: read-only fs, tmpfs /tmp only, no access logs, no proxy
   buffering to disk, cookies stripped on the relay.

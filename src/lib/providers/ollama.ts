@@ -2,6 +2,7 @@ import type {
   ChatRequest,
   ModelInfo,
   StreamEvent,
+  Usage,
   WireMessage,
 } from "@/lib/types"
 import { cleanKey, dataUrlToBase64, uid } from "@/lib/utils"
@@ -191,6 +192,7 @@ export async function* streamOllama(
   const decoder = new TextDecoder()
   let buf = ""
   let finish: string | undefined
+  let usage: Usage | undefined
 
   while (true) {
     const { done, value } = await reader.read()
@@ -222,8 +224,20 @@ export async function* streamOllama(
           })),
         }
       }
-      if (json.done) finish = json.done_reason ?? "stop"
+      if (json.done) {
+        finish = json.done_reason ?? "stop"
+        // the closing object carries eval counts (tokens) and durations (ns)
+        if (json.prompt_eval_count || json.eval_count) {
+          usage = {
+            promptTokens: json.prompt_eval_count ?? undefined,
+            completionTokens: json.eval_count ?? undefined,
+            genMs: json.eval_duration
+              ? Math.round(json.eval_duration / 1e6)
+              : undefined,
+          }
+        }
+      }
     }
   }
-  yield { type: "done", finish }
+  yield { type: "done", finish, usage }
 }

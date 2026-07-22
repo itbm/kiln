@@ -50,7 +50,13 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   A meter pill appears at 60% usage for one-tap compaction.
 - **Slash commands** — type `/` in the composer: `/compact [focus]`,
   `/clear` (fresh context, messages kept), `/title`, `/model`, `/effort`,
-  `/export`, `/help`.
+  `/export`, `/stats`, `/help`.
+- **Usage & cost** — every reply records what the provider actually
+  reported, never an estimate: tokens in/out (with cached and reasoning
+  splits), the exact credits charged on OpenRouter, and generation speed
+  on Ollama. A quiet readout under each reply expands on tap, and
+  **Usage & cost** in the chat menu (or `/stats`) totals the whole chat —
+  regenerated attempts included, per model.
 - **Message editing & versions** — edit any of your messages and resend
   (later messages are replaced after a confirm); regenerating a reply keeps
   every attempt with a Claude-style ‹ 1/2 › version switcher, including

@@ -11,9 +11,10 @@ const sse = (events) =>
   events.map((e) => `data: ${JSON.stringify(e)}`).join("\n\n") +
   "\n\ndata: [DONE]\n\n"
 
-const chunk = (delta, finish = null) => ({
+const chunk = (delta, finish = null, usage = null) => ({
   id: "gen-1",
   choices: [{ delta, finish_reason: finish }],
+  ...(usage ? { usage } : {}),
 })
 
 // Round 1: model asks for a web search
@@ -31,7 +32,11 @@ const round1 = sse([
   chunk({
     tool_calls: [{ index: 0, function: { arguments: 'resso beans 2026"}' } }],
   }),
-  chunk({}, "tool_calls"),
+  chunk({}, "tool_calls", {
+    prompt_tokens: 412,
+    completion_tokens: 24,
+    cost: 0.0016,
+  }),
 ])
 
 // Round 2: reasoning + prose + a markdown artifact. The reply opens with a
@@ -49,7 +54,13 @@ const round2 = sse([
   }),
   chunk({ content: "- **Fresh roast date** beats brand\n- Medium-dark for milk drinks\n" }),
   chunk({ content: "</artifact>\n\nWant tasting notes for any of these?" }),
-  chunk({}, "stop"),
+  chunk({}, "stop", {
+    prompt_tokens: 655,
+    completion_tokens: 128,
+    cost: 0.0024,
+    prompt_tokens_details: { cached_tokens: 300 },
+    completion_tokens_details: { reasoning_tokens: 22 },
+  }),
 ])
 
 // Title call
@@ -185,6 +196,20 @@ if (await page.getByText("<thoughtful>").count()) {
   console.error("ASSERT FAIL: bare mood tag leaked into the chat")
   process.exitCode = 1
 } else console.log("ok: bare mood tag stripped from the reply")
+
+// --- usage caption: both tool rounds summed, cost from the provider ---
+// round1 ($0.0016) + round2 ($0.0024) = $0.004
+const usageBtn = page.getByText("$0.004", { exact: true })
+await usageBtn.waitFor({ timeout: 5000 })
+console.log("ok: usage caption shows summed provider cost")
+await usageBtn.click()
+const usageDetail = page.getByText(
+  "1.1k in (300 cached) · 152 out (22 reasoning) · $0.004",
+  { exact: true },
+)
+await usageDetail.waitFor({ timeout: 5000 })
+console.log("ok: caption expands to the full token breakdown")
+await usageDetail.click() // collapse again
 await page.screenshot({ path: "shots/e2e-stream-result.png" })
 
 // artifact viewer opens with rendered markdown
@@ -203,6 +228,9 @@ if (await page.getByText("<thoughtful>").count()) {
   console.error("ASSERT FAIL: bare mood tag leaked after reload")
   process.exitCode = 1
 } else console.log("ok: bare mood tag still hidden after reload")
+// usage survives the round-trip through IndexedDB
+await page.getByText("$0.004", { exact: true }).waitFor({ timeout: 5000 })
+console.log("ok: usage caption persists across reload")
 
 // --- regenerate keeps the old attempt as a version ---
 await page.getByLabel("Regenerate").click()
@@ -213,6 +241,18 @@ await page.getByLabel("Next version").click()
 await page.getByText("2/2").waitFor({ timeout: 5000 })
 console.log("ok: regenerate created version 2/2 and switcher works")
 await page.screenshot({ path: "shots/e2e-versions.png" })
+
+// --- /stats dialog: totals cover BOTH attempts of the regenerated reply ---
+await page.getByPlaceholder("Message Kiln…").fill("/stats")
+await page.getByLabel("Send").click()
+await page.getByText("1 (2 attempts)").waitFor({ timeout: 5000 })
+await page.getByText("2.1k (600 cached)").waitFor({ timeout: 5000 })
+await page.getByText("304 (44 reasoning)").waitFor({ timeout: 5000 })
+await page.getByText("$0.008", { exact: true }).waitFor({ timeout: 5000 })
+console.log("ok: /stats sums tokens and cost across attempts")
+await page.screenshot({ path: "shots/e2e-usage-stats.png" })
+await page.keyboard.press("Escape")
+await page.getByText("1 (2 attempts)").waitFor({ state: "detached", timeout: 5000 })
 
 // --- /help command ---
 await page.getByPlaceholder("Message Kiln…").fill("/help")
@@ -335,6 +375,7 @@ const assertTrue = (cond, msg) => {
 }
 assertTrue(first.model === "anthropic/claude-sonnet-4.5", "model id sent")
 assertTrue(first.stream === true, "stream requested")
+assertTrue(first.usage?.include === true, "usage accounting requested")
 assertTrue(first.messages[0].role === "system", "system prompt first")
 assertTrue(
   first.tools?.some((t) => t.function.name === "web_search"),

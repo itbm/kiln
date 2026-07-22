@@ -13,6 +13,7 @@ import {
 import type { Message } from "@/lib/types"
 import { splitContent, type ArtifactBlock } from "@/lib/artifacts"
 import { effortCaption } from "@/lib/effort"
+import { usageCaption, usageDetail } from "@/lib/usage"
 import { activeVersionIndex, versionCount } from "@/lib/versions"
 import { cn } from "@/lib/utils"
 import { useStream } from "@/stores/stream"
@@ -35,6 +36,30 @@ function ModelCaption({ msg }: { msg: Message }) {
         ? ` · ${effortCaption(msg.effort)}`
         : ""}
     </span>
+  )
+}
+
+/** Cost (or tokens) of the active generation; tap for the full breakdown. */
+function UsageCaption({ msg }: { msg: Message }) {
+  const [expanded, setExpanded] = useState(false)
+  const u = msg.usage
+  const text = u && (expanded ? usageDetail(u) : usageCaption(u))
+  if (!text) return null
+  return (
+    <>
+      {(msg.modelName ?? msg.model) && <span aria-hidden>·</span>}
+      <button
+        type="button"
+        aria-label={expanded ? "Hide usage details" : "Show tokens and cost"}
+        className={cn(
+          "min-w-0 text-left tabular-nums transition-colors hover:text-foreground",
+          expanded ? "whitespace-normal" : "shrink-0",
+        )}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {text}
+      </button>
+    </>
   )
 }
 
@@ -299,6 +324,7 @@ export const MessageView = memo(function MessageView({
             </span>
           )}
           <ModelCaption msg={msg} />
+          <UsageCaption msg={msg} />
           <div className="ml-auto flex items-center opacity-70 transition-opacity group-hover:opacity-100">
             {(content || reasoning) && <CopyIconButton text={content} />}
             {isLast && onRetry && !busy && (

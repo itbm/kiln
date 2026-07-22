@@ -5,6 +5,7 @@ import type {
   Message,
   ModelRef,
   ToolStep,
+  Usage,
   WireMessage,
 } from "./types"
 import { db } from "./db"
@@ -17,6 +18,7 @@ import { findEmotion } from "./emotions"
 import { pip } from "@/pip/bus"
 import { notifyChatDone, acquireWakeLock, releaseWakeLock } from "./notify"
 import { estimateWireTokens, compactChat } from "./compact"
+import { addUsage } from "./usage"
 import { beginNewVersion } from "./versions"
 import { toast } from "sonner"
 import { useStream } from "@/stores/stream"
@@ -262,6 +264,7 @@ async function runAssistantTurn(
   }
   const steps: ToolStep[] = []
   const images: { id: string; dataUrl: string }[] = []
+  let usage: Usage | undefined
   let lastPersist = Date.now()
   let finalStatus: Message["status"] = "done"
   let errorText: string | undefined
@@ -273,6 +276,7 @@ async function runAssistantTurn(
     reasoningMs,
     steps: steps.length ? steps.map((s) => ({ ...s })) : undefined,
     images: images.length ? [...images] : undefined,
+    usage,
   })
 
   // Throttle store updates (~12fps) so long streams don't re-render per token
@@ -307,6 +311,8 @@ async function runAssistantTurn(
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       let toolCalls: import("./types").WireToolCall[] = []
+      let roundUsage: Usage | undefined
+      let roundGenStart = 0
 
       for await (const ev of streamChat(modelRef.provider, {
         model: modelRef.model,
@@ -317,22 +323,35 @@ async function runAssistantTurn(
         signal: controller.signal,
       })) {
         if (ev.type === "reasoning") {
+          if (!roundGenStart) roundGenStart = Date.now()
           if (!reasoning) reasoningStart = Date.now()
           reasoning += ev.text
         } else if (ev.type === "text") {
+          if (!roundGenStart) roundGenStart = Date.now()
           if (reasoningStart && reasoningMs === undefined)
             reasoningMs = Date.now() - reasoningStart
           content += ev.text
           feedEmotion()
         } else if (ev.type === "image") {
+          if (!roundGenStart) roundGenStart = Date.now()
           // some providers repeat the same image in later stream chunks
           if (!images.some((im) => im.dataUrl === ev.dataUrl))
             images.push({ id: uid(), dataUrl: ev.dataUrl })
         } else if (ev.type === "tool_calls") {
           toolCalls = ev.calls
+        } else if (ev.type === "done" && ev.usage) {
+          roundUsage = ev.usage
         }
         pushLive()
         await maybePersist()
+      }
+
+      if (roundUsage) {
+        // Ollama times its own generation; for the rest, wall clock from
+        // the round's first token is the honest approximation for tok/s
+        if (roundUsage.genMs === undefined && roundGenStart)
+          roundUsage.genMs = Date.now() - roundGenStart
+        usage = addUsage(usage, roundUsage)
       }
 
       if (!toolCalls.length) break
