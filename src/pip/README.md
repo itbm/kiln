@@ -16,9 +16,10 @@ strips it so users never see it. Some models drift into a bare
 the start of a reply. Quick feelings (happy, surprised, angry)
 are pulses on his existing envelopes; lingering ones set a mood that
 colours everything for a while and then fades — mildly sad news banks his
-flame down, droops his brows and mouth and swaps his idle hops for sighs;
-truly heartbreaking news (`crying`) adds welling eyes, falling tears and
-a sniffly shudder; `excited` keeps him bouncing, `thoughtful` sends his
+flame down, droops his brows and mouth, swaps his idle hops for sighs and
+wells his eyes up with the odd tear rolling out, so sadness is never
+ambiguous; truly heartbreaking news (`crying`) turns that into proper
+streams with a sniffly shudder; `excited` keeps him bouncing, `thoughtful` sends his
 gaze drifting upward between slow blinks, `worried` is a low-grade frown.
 A glum mood also mutes the end-of-reply celebration — he darts home
 without the wave and confetti.

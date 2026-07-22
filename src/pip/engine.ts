@@ -604,7 +604,9 @@ export class PipEngine {
     const sadTgt =
       this.mood === "sad" ? this.moodK : this.mood === "worried" ? 0.32 : 0
     this.sadK += (sadTgt - this.sadK) * (1 - Math.pow(0.05, dt))
-    const tearTgt = this.mood === "sad" && this.moodK > 0.85 ? 1 : 0
+    /* sadness should be unmistakable: plain sad wells up and weeps a
+       slow tear; crying (moodK > 0.85) opens the floodgates */
+    const tearTgt = this.mood === "sad" ? (this.moodK > 0.85 ? 1 : 0.55) : 0
     this.tearK +=
       (tearTgt - this.tearK) * (1 - Math.pow(tearTgt ? 0.01 : 0.08, dt))
     this.excK +=
@@ -614,8 +616,12 @@ export class PipEngine {
       this.surpT += dt
       if (this.surpT > 1.1) this.surpT = -1
     }
-    /* crying: tears dribble from the eyes */
-    if (this.tearK > 0.3 && Math.random() < dt * (1 + this.tearK * 2.2)) {
+    /* falling tears: a slow weep when sad, streams when crying —
+       the steep curve keeps the two moods clearly apart */
+    if (
+      this.tearK > 0.3 &&
+      Math.random() < dt * 3.4 * this.tearK * Math.sqrt(this.tearK)
+    ) {
       const side = Math.random() < 0.5 ? -1 : 1
       this.drops.tear(
         this.px + side * Sc * 0.16,

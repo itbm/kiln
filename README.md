@@ -121,8 +121,9 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   under the header, gets clobbered by the opening sidebar and jetpacks
   over to shove it shut. He reacts to the conversation's mood too: while
   he's enabled, replies open with a hidden `<emotion>` tag (stripped
-  before display) that he acts on — sighs and drooping brows for sad
-  news, actual tears for heartbreaking news, bouncing for exciting news.
+  before display) that he acts on — sighs, drooping brows and welling
+  tears for sad news, full streaming tears for heartbreaking news,
+  bouncing for exciting news.
   While an artefact streams in he dons a hard hat and plays builder on
   its card, cycling hammer, saw and drill as the job drags on — and past
   30 seconds he jetpacks the card up to the top of the screen and

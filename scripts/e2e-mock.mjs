@@ -72,6 +72,17 @@ const summaryResp = sse([
   chunk({}, "stop"),
 ])
 
+// Sad-mood reply — the wrapped <emotion> tag split mid-stream; Pip must
+// well up (tears are the only blue he ever wears) and the tag never renders
+const sadResp = sse([
+  chunk({ content: "<emo" }),
+  chunk({
+    content:
+      "tion>sad</emotion>I'm sorry — that's genuinely sad news. Take a moment; I'm right here.",
+  }),
+  chunk({}, "stop", { prompt_tokens: 40, completion_tokens: 18, cost: 0.0002 }),
+])
+
 // Interactive questions reply — split across chunks mid-tag to exercise
 // the streaming partial-tag handling
 const questionsResp = sse([
@@ -148,6 +159,9 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
   const asksQuestions =
     typeof lastUser?.content === "string" &&
     lastUser.content.includes("Ask me setup questions")
+  const isSadNews =
+    typeof lastUser?.content === "string" &&
+    lastUser.content.includes("sad news")
   const hasToolResult = body.messages?.some((m) => m.role === "tool")
   const payload = isTitle
     ? titleResp
@@ -155,9 +169,11 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
       ? summaryResp
       : asksQuestions
         ? questionsResp
-        : hasToolResult
-          ? round2
-          : round1
+        : isSadNews
+          ? sadResp
+          : hasToolResult
+            ? round2
+            : round1
   await route.fulfill({
     status: 200,
     headers: { "content-type": "text/event-stream" },
@@ -365,6 +381,35 @@ if (!compactionCall) {
   console.error("ASSERT FAIL: no compaction call was made")
   process.exitCode = 1
 }
+
+// --- sad mood: Pip visibly wells up (tears are his only blue paint) ---
+await page.getByPlaceholder("Message Kiln…").fill("I have some sad news to share")
+await page.getByLabel("Send").click()
+await page.getByText("Take a moment; I'm right here.").waitFor({ timeout: 15000 })
+if (await page.getByText("<emotion>sad").count()) {
+  console.error("ASSERT FAIL: wrapped emotion tag leaked into the chat")
+  process.exitCode = 1
+} else console.log("ok: wrapped emotion tag stripped from the sad reply")
+await page.waitForTimeout(1200) // tears well in over ~a second
+let tearPx = 0
+for (let i = 0; i < 8; i++) {
+  const n = await page.evaluate(() => {
+    const cv = document.querySelector("canvas[aria-hidden]")
+    const g = cv?.getContext("2d")
+    if (!cv || !g) return -1
+    const d = g.getImageData(0, 0, cv.width, cv.height).data
+    let count = 0
+    for (let i = 0; i < d.length; i += 4)
+      if (d[i + 3] > 120 && d[i + 2] > 180 && d[i + 2] > d[i] + 25) count++
+    return count
+  })
+  tearPx = Math.max(tearPx, n)
+  await page.waitForTimeout(350)
+}
+if (tearPx < 12) {
+  console.error(`ASSERT FAIL: no visible tears while sad (${tearPx} blue px)`)
+  process.exitCode = 1
+} else console.log(`ok: sad mood wells up visible tears (${tearPx} blue px)`)
 
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })
