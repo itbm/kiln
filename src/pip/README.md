@@ -2,10 +2,10 @@
 
 Pip is the little flame who lives in every theme (born in Ember, kept on
 in Classic — the Settings toggle is the only thing that retires him): he
-perches around the UI, throws axes on the home screen, strolls the
-composer ledge, does pull-ups under the header, gets clobbered by the
-opening sidebar (and sulks about it), and jetpacks over to shove it
-shut. Tapping him earns you an eep.
+perches around the UI, throws axes — and juggles embers, and walks a
+tightrope — on the home screen, strolls the composer ledge, does pull-ups
+under the header, gets clobbered by the opening sidebar (and sulks about
+it), and jetpacks over to shove it shut. Tapping him earns you an eep.
 
 He also feels the conversation. While he's on stage the system prompt
 asks the model to open every reply with a hidden `<emotion>…</emotion>`
@@ -23,6 +23,12 @@ streams with a sniffly shudder; `excited` keeps him bouncing, `thoughtful` sends
 gaze drifting upward between slow blinks, `worried` is a low-grade frown.
 A glum mood also mutes the end-of-reply celebration — he darts home
 without the wave and confetti.
+
+When a request *falls over* he doesn't just mope, he reels — a physical
+act, not a mood tag: a rate limit (429) leaves him **dizzy**, stars
+circling, while a hard stream error **faints** him clean over before he
+springs back up (`actions/stumble.ts`, fired from `lib/engine.ts` on an
+errored turn — rate-limit-ish errors pick dizzy, everything else faint).
 
 Mid-conversation the messages are the show, so he calms right down:
 spots flagged `calm` (see `anchors.ts`) confine him to the composer
@@ -53,6 +59,19 @@ yellow **hard hat** (site rules) and plays builder on its top edge
   so popping off for an overlay doesn't reset it.
 
 He returns to the ledge the moment the card completes.
+
+The Images page has its own twin of this. While a picture generates its
+tile carries `data-art-generating`'s cousin `data-art-painting`, and Pip
+hops up in a **beret**, palette in hand, to paint it into being — a round
+brush (dabbing, coloured splats), a palette knife (broad smears), colour
+reloaded off the palette between, and the odd grand flourish once the job
+drags on (`actions/paint.ts`, offered by `anchors.ts` → `painterSiteSpot`;
+a tall first image is ridden by its visible top edge). And whenever a
+conversation is **compacted**, Pip reads the summarising as tidying up:
+out comes a **broom** and he sweeps a little dust cloud until it lands
+(`actions/sweep.ts`, opened and closed by `lib/compact.ts` via
+`pip.sweep`, with a safety cap so a stalled compaction never leaves him
+sweeping forever).
 
 He is a single `<canvas>` overlay (`PipCanvas.tsx`) driven by a
 requestAnimationFrame engine (`engine.ts`). He is decorative by
@@ -89,7 +108,13 @@ Two kinds, both registered in `actions/index.ts`:
 - **Ring act** — a short performance on the home-screen ring. Implement
   `RingAct` and append it to `ringActs`; the rest action picks one by
   weight when Pip is loitering on the ring. `axe-throw.ts` is the
-  template — a Christmas variant might pop up a fir tree instead of the
+  template — the family now also holds `juggle.ts` (three embers cascading
+  overhead) and `tightrope.ts` (a wire and a see-sawing balance pole). A
+  ring act animates `SceneProp`s and nudges Pip through the shared pose
+  fields the engine already exposes (`e.windup` raises his throwing hand,
+  `e.tiltExtra` leans him, `e.flareV`/`e.gigPulse` for punctuation) — it
+  doesn't repose him directly, and it resets anything lingering (`e.windup`)
+  in `cancel`. A Christmas variant might pop up a fir tree instead of the
   round target.
 
 ## Adding an accessory

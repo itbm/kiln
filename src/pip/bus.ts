@@ -10,6 +10,8 @@ export interface PipHandle {
   emote(emotion: string): void
   drawerOpening(): void
   drawerClosing(): void
+  sweep(on: boolean): void
+  stumble(kind: string): void
 }
 
 let current: PipHandle | null = null
@@ -33,6 +35,10 @@ export const pip = {
   drawerOpening: () => current?.drawerOpening(),
   /** the sidebar drawer was dismissed (Pip jets over to shove it shut) */
   drawerClosing: () => current?.drawerClosing(),
+  /** conversation is being compacted — sweep up (true) then stop (false) */
+  sweep: (on: boolean) => current?.sweep(on),
+  /** a request failed — reel from it: "dizzy" (rate-limited) or "faint" */
+  stumble: (kind: string) => current?.stumble(kind),
 }
 
 /* dev-only handle for poking moods from the console:

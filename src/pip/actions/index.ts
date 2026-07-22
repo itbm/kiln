@@ -6,9 +6,14 @@ import { DartAction } from "./dart"
 import { DrawerHitAction } from "./drawer-hit"
 import { FallAction } from "./fall"
 import { JetCloseAction } from "./jetpack-close"
+import { JuggleAct } from "./juggle"
+import { PaintAction } from "./paint"
 import { PatrolAction } from "./patrol"
 import { PullupsAction } from "./pullups"
 import { RestAction } from "./rest"
+import { StumbleAction } from "./stumble"
+import { SweepAction } from "./sweep"
+import { TightropeAct } from "./tightrope"
 
 /**
  * Pip's repertoire. One file per action — to teach him something new,
@@ -27,6 +32,9 @@ export interface ActionSet {
   hit: DrawerHitAction
   jet: JetCloseAction
   build: BuildAction
+  paint: PaintAction
+  sweep: SweepAction
+  stumble: StumbleAction
   /** engine.mode → handler for that mode */
   byMode: Record<string, PipAction>
   ringActs: RingAct[]
@@ -41,6 +49,9 @@ export function createActions(e: PipEngine): ActionSet {
   const hit = new DrawerHitAction(e)
   const jet = new JetCloseAction(e)
   const build = new BuildAction(e)
+  const paint = new PaintAction(e)
+  const sweep = new SweepAction(e)
+  const stumble = new StumbleAction(e)
   return {
     rest,
     dart,
@@ -50,6 +61,9 @@ export function createActions(e: PipEngine): ActionSet {
     hit,
     jet,
     build,
+    paint,
+    sweep,
+    stumble,
     byMode: {
       rest,
       dart,
@@ -60,7 +74,10 @@ export function createActions(e: PipEngine): ActionSet {
       jet,
       push: jet,
       build,
+      paint,
+      sweep,
+      stumble,
     },
-    ringActs: [new AxeThrowAct(e)],
+    ringActs: [new AxeThrowAct(e), new JuggleAct(e), new TightropeAct(e)],
   }
 }

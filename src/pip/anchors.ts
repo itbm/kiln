@@ -142,6 +142,37 @@ export function buildSiteSpot(env: AnchorEnv): Spot | null {
   }
 }
 
+/**
+ * The image tile currently painting in on the Images page — Pip's easel.
+ * The twin of buildSiteSpot for a different medium: offered on the same
+ * terms (no overlay over the page, a strip of canvas above the composer),
+ * but a full-width first image can be taller than the viewport, so we ride
+ * the *visible* top edge (clamped below the header) rather than the real one.
+ */
+export function painterSiteSpot(env: AnchorEnv): Spot | null {
+  if (
+    q('[data-slot="drawer-content"]') ||
+    q('[data-slot="dialog-content"]') ||
+    q('[data-pip-spot="ring"]')
+  )
+    return null
+  const r = rectOfEl(q('[data-art-painting="true"]'))
+  const comp = rectOfEl(q('[data-pip-spot="composer"]'))
+  if (!r || !comp) return null
+  const S = baseS(env.W, env.H)
+  if (r.bottom < 100 || r.top > comp.top - S * 0.7) return null
+  const top = clamp(r.top, 64, comp.top - S * 0.7)
+  return {
+    id: "paint-site",
+    ride: true,
+    calm: true,
+    w: 2,
+    x: clamp(r.right - S * 0.7, r.left + S * 0.5, r.right - S * 0.4),
+    y: top - S * 0.66 * 0.52,
+    s: 0.66,
+  }
+}
+
 /** All spots available in the current DOM/overlay state. */
 export function elSpots(env: AnchorEnv): Spot[] {
   const S = baseS(env.W, env.H)
@@ -245,8 +276,9 @@ export function elSpots(env: AnchorEnv): Spot[] {
       { w: 3, home: true, calm: true },
     )
     addZone("floor", 2, { fx: 0.48 + Math.random() * 0.14, calm: true })
-    /* while an artefact streams in, its card is his building site */
-    const site = buildSiteSpot(env)
+    /* while an artefact streams in, its card is his building site; on the
+       Images page a painting tile is his easel instead */
+    const site = buildSiteSpot(env) ?? painterSiteSpot(env)
     if (site) out.push(site)
   } else {
     add(

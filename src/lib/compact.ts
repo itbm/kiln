@@ -5,6 +5,7 @@ import { completeText } from "./providers"
 import { contentWithoutArtifacts } from "./artifacts"
 import { getSettings } from "@/stores/settings"
 import { useTemp } from "@/stores/temp"
+import { pip } from "@/pip/bus"
 
 /** chars/4 heuristic — good enough for budgeting, no tokenizer needed */
 export function estimateTokens(text: string | undefined): number {
@@ -90,23 +91,31 @@ export async function compactChat(
   user += `Conversation:\n${transcript}`
   if (opts.instructions) user += `\n\nExtra focus requested by the user: ${opts.instructions}`
 
-  let summary = await completeText(ref.provider, {
-    model: ref.model,
-    effort: "auto",
-    messages: [
-      { role: "system", content: SUMMARIZE_PROMPT },
-      { role: "user", content: user },
-    ],
-  })
-  summary = summary.replace(/<think>[\s\S]*?<\/think>/g, "").trim()
-  if (!summary) throw new Error("Compaction model returned nothing")
+  /* Pip reads the summarising as tidying up and sweeps while it runs (a
+     no-op when he isn't on screen); the finally makes sure he stops even
+     if the model call throws. */
+  pip.sweep(true)
+  try {
+    let summary = await completeText(ref.provider, {
+      model: ref.model,
+      effort: "auto",
+      messages: [
+        { role: "system", content: SUMMARIZE_PROMPT },
+        { role: "user", content: user },
+      ],
+    })
+    summary = summary.replace(/<think>[\s\S]*?<\/think>/g, "").trim()
+    if (!summary) throw new Error("Compaction model returned nothing")
 
-  const newCutoff = toSummarize[toSummarize.length - 1].createdAt
-  const updated = await patchChat(chat, {
-    summary: summary.slice(0, 8000),
-    summaryCutoff: newCutoff,
-  })
-  return { chat: updated, summarizedCount: toSummarize.length }
+    const newCutoff = toSummarize[toSummarize.length - 1].createdAt
+    const updated = await patchChat(chat, {
+      summary: summary.slice(0, 8000),
+      summaryCutoff: newCutoff,
+    })
+    return { chat: updated, summarizedCount: toSummarize.length }
+  } finally {
+    pip.sweep(false)
+  }
 }
 
 /** Drop all prior context (messages stay visible, nothing is sent as history). */

@@ -4,6 +4,7 @@ import {
   drawerEl,
   elSpots,
   ovKey,
+  painterSiteSpot,
   pickSpot,
   rectOfEl,
   resolveSpot,
@@ -92,6 +93,9 @@ export class PipEngine {
   puK = 0
   puEffort = 0
   hitT = 0
+  /* true while a conversation is compacting — the sweep action keeps
+     tidying until it clears (see bus.sweep / actions/sweep.ts) */
+  sweepReq = false
 
   /* pointer */
   mouseX = -9999
@@ -399,6 +403,44 @@ export class PipEngine {
     this.actions.jet.beginClose()
   }
 
+  /**
+   * The app is compacting a conversation (see lib/compact.ts). Pip reads
+   * summarising as tidying up: he fetches a broom and sweeps until the job
+   * clears. on=true opens the request, on=false closes it — the sweep action
+   * finishes its current stroke and darts home. A safety cap in the action
+   * stops him even if the "off" never arrives.
+   */
+  sweep(on: boolean) {
+    if (this.reduceMotion) return
+    this.sweepReq = on
+    if (!on) return
+    if (
+      this.mode === "sweep" ||
+      this.mode === "build" ||
+      this.mode === "paint" ||
+      this.mode === "stumble" ||
+      this.mode === "fall" ||
+      this.busy()
+    )
+      return
+    this.actions.sweep.begin()
+  }
+
+  /**
+   * A request failed. Rather than a bare mood tag, Pip physically reels:
+   * "dizzy" (rate limits — he's been asked too much too fast, so he wobbles
+   * and sees stars) or "faint" (a hard stream error keels him over). Recovers
+   * on his own and re-perches.
+   */
+  stumble(kind: string) {
+    if (this.reduceMotion) {
+      this.renderOnce()
+      return
+    }
+    if (this.busy() || this.mode === "stumble") return
+    this.actions.stumble.begin(kind === "dizzy" ? "dizzy" : "faint")
+  }
+
   /* ---------- helpers used by actions ---------- */
 
   busy(): boolean {
@@ -560,9 +602,15 @@ export class PipEngine {
         if (k !== this.lastOv) {
           this.lastOv = k
           this.startDart(pickSpot(this.env, this.spot?.id))
-        } else if (this.mode !== "build" && this.spot?.id !== "art-site") {
-          /* a streaming artefact card calls him up to play builder */
-          const site = buildSiteSpot(this.env)
+        } else if (
+          this.mode !== "build" &&
+          this.mode !== "paint" &&
+          this.spot?.id !== "art-site" &&
+          this.spot?.id !== "paint-site"
+        ) {
+          /* a streaming artefact card calls him up to play builder; a
+             painting tile on the Images page calls him up to play painter */
+          const site = buildSiteSpot(this.env) ?? painterSiteSpot(this.env)
           if (site) this.startDart(site)
         }
       }

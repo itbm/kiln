@@ -23,7 +23,12 @@ import { ImageLightbox } from "@/components/chat/ImageLightbox"
 
 function PaintingTile() {
   return (
-    <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40">
+    <div
+      // Pip's easel: while this tile shimmers, painter Pip perches on its top
+      // edge and paints (see src/pip/anchors.ts → painterSiteSpot)
+      data-art-painting="true"
+      className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40"
+    >
       <span className="shimmer text-[14px]">Painting…</span>
     </div>
   )

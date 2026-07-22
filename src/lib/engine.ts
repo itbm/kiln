@@ -428,6 +428,16 @@ async function runAssistantTurn(
       : contentWithoutArtifacts(content) || (images.length ? "Image ready" : "")
   void notifyChatDone(chat.id, chat.title, preview)
 
+  /* a failed request knocks Pip about: rate limits leave him dizzy, a hard
+     stream error faints him (a no-op when he isn't on screen). User-initiated
+     stops don't count — nothing went wrong. */
+  if (finalStatus === "error" && errorText) {
+    const dizzy = /\b429\b|rate.?limit|too many|overload|quota|capacity|slow down/i.test(
+      errorText,
+    )
+    pip.stumble(dizzy ? "dizzy" : "faint")
+  }
+
   if (
     finalStatus === "done" &&
     !chat.titleIsManual &&
