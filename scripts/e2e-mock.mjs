@@ -181,6 +181,31 @@ const errors = []
 page.on("pageerror", (e) => errors.push(e.message))
 
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
+
+// --- Pip stays on screen when the opening sidebar clobbers him ---
+// He idles on the home ring (screen centre), squarely in the drawer's
+// path. Open it, let the knock-and-bounce physics fully settle, then
+// count his opaque pixels: a ricochet must never carry him off-screen
+// (the old single-wall bounce could leave him resting at negative x).
+await page.waitForTimeout(1000)
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(4500)
+const pipPixels = await page.evaluate(() => {
+  const cv = document.querySelector("canvas[aria-hidden]")
+  const g = cv?.getContext("2d")
+  if (!cv || !g) return -1
+  const data = g.getImageData(0, 0, cv.width, cv.height).data
+  let n = 0
+  for (let i = 3; i < data.length; i += 4) if (data[i] > 50) n++
+  return n
+})
+if (pipPixels < 800) {
+  console.error(`ASSERT FAIL: Pip off-screen after sidebar knock (${pipPixels} visible px)`)
+  process.exitCode = 1
+} else console.log(`ok: Pip visible after the sidebar knock (${pipPixels} px)`)
+await page.keyboard.press("Escape") // close the drawer (he shoves it shut)
+await page.waitForTimeout(600)
+
 await page.getByPlaceholder("Message Kiln…").fill("What espresso beans should I buy?")
 await page.getByLabel("Send").click()
 

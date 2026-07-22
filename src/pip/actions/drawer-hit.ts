@@ -45,9 +45,21 @@ export class DrawerHitAction implements PipAction {
     e.py += this.vy * dt
     e.tiltO += this.tiltV * dt
     this.tiltV *= 1 - dt * 1.4
-    if (e.px > e.W - 26) {
+    /* both side walls bounce — with only the right one, a fast ricochet
+       used to carry him clean off the left edge of the screen (he'd even
+       come to rest out there, invisible, until the next dart) */
+    if (e.px > e.W - 26 && this.vx > 0) {
       e.px = e.W - 26
       this.vx *= -0.45
+    } else if (e.px < 26 && this.vx < 0) {
+      e.px = 26
+      this.vx *= -0.45
+    }
+    /* and launched from a high perch, the arc must not clear the top —
+       keep his flame tip on screen (matters on short/landscape viewports) */
+    if (e.py < Sc * 1.2 && this.vy < 0) {
+      e.py = Sc * 1.2
+      this.vy *= -0.3
     }
     const hc = rectOfEl(document.querySelector('[data-pip-spot="composer"]'))
     const hFloor = hc ? hc.top - Sc * 0.5 : e.H - 70
