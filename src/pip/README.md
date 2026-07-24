@@ -2,10 +2,11 @@
 
 Pip is the little flame who lives in every theme (born in Ember, kept on
 in Classic — the Settings toggle is the only thing that retires him): he
-perches around the UI, throws axes on the home screen, strolls the
-composer ledge, does pull-ups under the header, gets clobbered by the
-opening sidebar (and sulks about it), and jetpacks over to shove it
-shut. Tapping him earns you an eep.
+perches around the UI, puts on turns on the home screen (axe throwing,
+the high wire, juggling embers), strolls the composer ledge, does
+pull-ups under the header, gets clobbered by the opening sidebar (and
+sulks about it), and jetpacks over to shove it shut. Tapping him earns
+you an eep.
 
 He also feels the conversation. While he's on stage the system prompt
 asks the model to open every reply with a hidden `<emotion>…</emotion>`
@@ -54,6 +55,29 @@ yellow **hard hat** (site rules) and plays builder on its top edge
 
 He returns to the ledge the moment the card completes.
 
+On the **Images** page the same trick runs in a smock: while a picture
+generates, the "Painting…" tile carries `data-art-painting` and he darts
+up onto its top edge in a **beret**, palette in his off hand
+(`actions/paint.ts`) — dipping for a fresh colour, dabbing, laying a long
+stroke, and now and then leaning back to size up the composition down the
+handle of his brush. Past **22 s** the job has earned a **signature**: he
+scoots to the corner and flourishes one onto the canvas, which then dries
+away on its own. He drops everything and goes home the moment the picture
+lands.
+
+A **compaction** puts him to work too: `compactChat` calls
+`pip.tidy(true/false)` around the summarising request, so while the older
+messages are being swept into a summary he fetches a **broom** and works
+the composer ledge in clouds of dust (`actions/sweep.ts`), finishing with
+two taps of the handle when the summary arrives. He gives up after 30 s
+if the call never comes.
+
+And when a turn **falls over** he takes it personally (`actions/swoon.ts`,
+wired from `lib/engine.ts`): a rate limit (429) spins him **dizzy** —
+staggering on the spot with stars orbiting his head — while any other
+stream error is a proper **faint**: he reels, keels over backwards and
+lies there with his flame guttering down to smoke before coming to.
+
 He is a single `<canvas>` overlay (`PipCanvas.tsx`) driven by a
 requestAnimationFrame engine (`engine.ts`). He is decorative by
 contract: the canvas is `pointer-events: none`, the tick is wrapped so a
@@ -69,7 +93,7 @@ renders him as a single still frame.
 | `accessories/`    | cosmetics drawn on top of him (hats…) — ships empty            |
 | `draw/pip.ts`     | the character art itself                                       |
 | `anchors.ts`      | where he may perch (driven by `data-pip-spot` attributes)      |
-| `bus.ts`          | `pip.celebrate()` etc. — safe no-ops when he's not mounted     |
+| `bus.ts`          | `pip.celebrate()`/`tidy()`/`mishap()` — no-ops when unmounted  |
 | `drops.ts`        | spark/smoke/sweat particles                                    |
 | `palette.ts`      | his colours (scheme-aware)                                     |
 
@@ -90,7 +114,12 @@ Two kinds, both registered in `actions/index.ts`:
   `RingAct` and append it to `ringActs`; the rest action picks one by
   weight when Pip is loitering on the ring. `axe-throw.ts` is the
   template — a Christmas variant might pop up a fir tree instead of the
-  round target.
+  round target. Acts drive him by writing `engine.px/py/tiltExtra/windup`
+  each frame, and they get the same optional `pose`/`drawFront` hooks a
+  mode does (RestAction forwards them to whichever act is running): the
+  tightrope uses them to put his arms out on a balance pole
+  (`tightrope.ts`), and the juggler to hold the cascade of embers over
+  his body (`juggle.ts`).
 
 ## Adding an accessory
 
@@ -98,6 +127,25 @@ Implement `PipAccessory` in `accessories/` and push it onto the list in
 `accessories/index.ts` (a seasonal theme can do this conditionally).
 Accessories draw in Pip's local unit space after his body and face — a
 Santa hat is ~15 lines; there's a sketch in `accessories/index.ts`.
+
+## What the app tells him
+
+Everything the app knows goes through `bus.ts`, and every call is a safe
+no-op when he isn't mounted (theme without Pip, Settings toggle off,
+reduced motion). Nothing outside `src/pip/` imports the engine.
+
+| Call | Sent from | He… |
+| ---- | --------- | --- |
+| `pip.flare()` / `pip.celebrate()` | `PipCanvas` (stream store) | flares up on send, darts home on landing |
+| `pip.emote(mood)` | `lib/engine.ts` | takes the reply's mood (`lib/emotions.ts`) |
+| `pip.tidy(on)` | `lib/compact.ts` | sweeps while the chat is compacted |
+| `pip.mishap(kind)` | `lib/engine.ts` | goes dizzy (`"rate"`) or faints (`"error"`) |
+| `pip.notify()` | anything that reshuffles the layout | re-perches if his spot has gone |
+| `pip.drawerOpening()` / `Closing()` | `AppShell` | braces for the sidebar, then jets after it |
+
+In dev, `__pip` on `window` fires all of them by hand, and
+`__pip.engine()` hands you the live engine (`engine().actions…`) for
+poking an action directly.
 
 ## Where he can perch
 

@@ -116,20 +116,25 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
 - **Themes & Pip** — two switchable app themes (Settings → Appearance):
   **Ember**, the char-and-ember brand look with Unbounded/Geist type, and
   **Classic**, the original cream & clay. Both come with **Pip the
-  stuntflame** — a tiny canvas mascot who perches around the UI, throws
-  axes on the home screen, strolls the composer ledge, does pull-ups
-  under the header, gets clobbered by the opening sidebar and jetpacks
-  over to shove it shut. He reacts to the conversation's mood too: while
-  he's enabled, replies open with a hidden `<emotion>` tag (stripped
-  before display) that he acts on — sighs, drooping brows and welling
-  tears for sad news, full streaming tears for heartbreaking news,
-  bouncing for exciting news.
+  stuntflame** — a tiny canvas mascot who perches around the UI, puts on
+  turns on the home screen (throwing axes, crossing a high wire with a
+  balance pole, juggling embers), strolls the composer ledge, does
+  pull-ups under the header, gets clobbered by the opening sidebar and
+  jetpacks over to shove it shut. He reacts to the conversation's mood
+  too: while he's enabled, replies open with a hidden `<emotion>` tag
+  (stripped before display) that he acts on — sighs, drooping brows and
+  welling tears for sad news, full streaming tears for heartbreaking
+  news, bouncing for exciting news.
   While an artefact streams in he dons a hard hat and plays builder on
   its card, cycling hammer, saw and drill as the job drags on — and past
   30 seconds he jetpacks the card up to the top of the screen and
-  parachutes it back down (toggle him off in Settings; he respects
-  reduced motion). Themes and Pip's tricks are both modular — see
-  `src/lib/themes/` and `src/pip/README.md`.
+  parachutes it back down. The same energy goes elsewhere: a beret and
+  palette while an image is generating (he signs the canvas if it takes
+  long enough), a broom and clouds of dust while a chat is being
+  compacted, and a dizzy spell or a dead faint when a reply errors out
+  (toggle him off in Settings; he respects reduced motion). Themes and
+  Pip's tricks are both modular — see `src/lib/themes/` and
+  `src/pip/README.md`.
 - **PWA** — installable, offline app shell, light/dark (or follow system),
   safe-area aware, iOS keyboard-friendly. Requests **persistent storage**
   so the browser won't evict your chats, shows storage usage in Settings,

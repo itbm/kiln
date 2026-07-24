@@ -114,32 +114,43 @@ export function zoneResolve(sp: Spot, env: AnchorEnv): ZonePoint | null {
 }
 
 /**
- * The artefact card currently streaming in — Pip's building site. Only
- * offered while no overlay covers the chat and the card's top edge sits
- * comfortably between header and composer (BuildAction uses a looser exit
- * band so he doesn't flicker on the boundary).
+ * A work surface Pip can stand on while something streams in: the artefact
+ * card he plays builder on, or the tile an image is being painted into.
+ * Only offered while no overlay covers the chat and the top edge sits
+ * comfortably between header and composer (BuildAction/PaintAction use a
+ * looser exit band so he doesn't flicker on the boundary).
  */
-export function buildSiteSpot(env: AnchorEnv): Spot | null {
+function siteSpot(env: AnchorEnv, sel: string, id: string, s: number): Spot | null {
   if (
     q('[data-slot="drawer-content"]') ||
     q('[data-slot="dialog-content"]') ||
     q('[data-pip-spot="ring"]')
   )
     return null
-  const r = rectOfEl(q('[data-art-generating="true"]'))
+  const r = rectOfEl(q(sel))
   const comp = rectOfEl(q('[data-pip-spot="composer"]'))
   if (!r || !comp) return null
   const S = baseS(env.W, env.H)
   if (r.top < 70 || r.top > comp.top - S * 1.4) return null
   return {
-    id: "art-site",
+    id,
     ride: true,
     calm: true,
     w: 2,
     x: r.right - S * 0.7,
-    y: r.top - S * 0.66 * 0.52,
-    s: 0.66,
+    y: r.top - S * s * 0.52,
+    s,
   }
+}
+
+/** the artefact card currently streaming in — Pip's building site */
+export function buildSiteSpot(env: AnchorEnv): Spot | null {
+  return siteSpot(env, '[data-art-generating="true"]', "art-site", 0.66)
+}
+
+/** the image tile currently generating — Pip's easel (Images page) */
+export function paintSiteSpot(env: AnchorEnv): Spot | null {
+  return siteSpot(env, '[data-art-painting="true"]', "art-easel", 0.64)
 }
 
 /** All spots available in the current DOM/overlay state. */
@@ -245,8 +256,9 @@ export function elSpots(env: AnchorEnv): Spot[] {
       { w: 3, home: true, calm: true },
     )
     addZone("floor", 2, { fx: 0.48 + Math.random() * 0.14, calm: true })
-    /* while an artefact streams in, its card is his building site */
-    const site = buildSiteSpot(env)
+    /* while an artefact streams in its card is his building site; on the
+       Images page the generating tile is his easel */
+    const site = buildSiteSpot(env) ?? paintSiteSpot(env)
     if (site) out.push(site)
   } else {
     add(
