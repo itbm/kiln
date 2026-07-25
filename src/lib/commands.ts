@@ -48,7 +48,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
   {
     name: "export",
-    description: "Download this chat as JSON",
+    args: "[json|md]",
+    description: "Download this chat as JSON or Markdown",
     needsChat: true,
   },
   {

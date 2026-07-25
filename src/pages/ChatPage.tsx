@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowDownIcon,
   ChartColumnIcon,
+  ClipboardCopyIcon,
   CloudUploadIcon,
   DownloadIcon,
   GhostIcon,
@@ -11,6 +12,7 @@ import {
   PencilIcon,
   ScissorsIcon,
   SearchIcon,
+  Share2Icon,
   SparklesIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -51,7 +53,14 @@ import {
   type QuestionsBlock,
 } from "@/lib/questions"
 import { revealMessage } from "@/lib/find"
-import { exportChatFile, uploadChatToServer } from "@/lib/sync"
+import {
+  canShare,
+  copyChatMarkdown,
+  downloadChatMarkdown,
+  exportChatFile,
+  shareChatMarkdown,
+  uploadChatToServer,
+} from "@/lib/sync"
 import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
 import { switchToVersion } from "@/lib/versions"
@@ -389,9 +398,14 @@ export default function ChatPage() {
             .catch((e) => toast.error(e.message))
         }
         break
-      case "export":
-        void exportChatFile(chat)
+      case "export": {
+        const format = (arg ?? "json").toLowerCase()
+        if (format === "md" || format === "markdown")
+          downloadChatMarkdown(chat, messages)
+        else if (format === "json") void exportChatFile(chat)
+        else toast.error("Usage: /export [json|md]")
         break
+      }
       case "stats":
         setStatsOpen(true)
         break
@@ -492,6 +506,26 @@ export default function ChatPage() {
                     <DropdownMenuItem onClick={() => setStatsOpen(true)}>
                       <ChartColumnIcon /> Usage & cost
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        copyChatMarkdown(chat, messages)
+                          .then(() => toast.success("Chat copied as Markdown"))
+                          .catch(() => toast.error("Couldn't copy the chat"))
+                      }
+                    >
+                      <ClipboardCopyIcon /> Copy as Markdown
+                    </DropdownMenuItem>
+                    {canShare() && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          shareChatMarkdown(chat, messages).catch((e) =>
+                            toast.error(e instanceof Error ? e.message : "Sharing failed"),
+                          )
+                        }
+                      >
+                        <Share2Icon /> Share…
+                      </DropdownMenuItem>
+                    )}
                     {chat.temporary ? (
                       <DropdownMenuItem
                         onClick={() => {

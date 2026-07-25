@@ -2,7 +2,7 @@
 // Tavily backend. Verifies streaming, the tool loop, artifact parsing,
 // persistence and title generation. Needs `npm run preview` on :4173.
 import { chromium } from "playwright"
-import { mkdirSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
 
 const BASE = "http://localhost:4173"
 mkdirSync("shots", { recursive: true })
@@ -103,6 +103,7 @@ const ctx = await browser.newContext({
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
+  permissions: ["clipboard-read", "clipboard-write"],
 })
 const page = await ctx.newPage()
 
@@ -308,6 +309,33 @@ await page.getByLabel("Send").click()
 await page.getByText("Slash commands").waitFor({ timeout: 5000 })
 await page.getByRole("button", { name: "OK" }).click()
 console.log("ok: /help dialog")
+
+// --- the chat as Markdown a person can read ---
+// Export/import is JSON because it round-trips; this is the other direction.
+await page.getByLabel("Chat options").click()
+await page.getByText("Copy as Markdown").click()
+await page.getByText("Chat copied as Markdown").waitFor({ timeout: 5000 })
+const md = await page.evaluate(() => navigator.clipboard.readText())
+writeFileSync("shots/e2e-transcript.md", md) // for eyeballing the formatting
+for (const [needle, what] of [
+  ["# Espresso bean picks", "the chat title as the document title"],
+  ["## You", "your turns"],
+  ["## Assistant · Claude Sonnet 4.5", "the model that answered each turn"],
+  ["*Searched “best espresso beans 2026”*", "the tool steps as the chips said them"],
+  ["**Artefact — Espresso beans — quick guide** (Markdown)", "artefacts, labelled"],
+  ["- **Fresh roast date** beats brand", "the artefact body in full"],
+  ["$0.004", "what the reply cost"],
+]) {
+  assertTrue(md.includes(needle), `transcript carries ${what}`)
+}
+for (const [needle, what] of [
+  ["<artifact", "artefact wire tags"],
+  ["<thoughtful>", "hidden mood tags"],
+  ["The search results mention", "the reasoning trace"],
+]) {
+  assertTrue(!md.includes(needle), `transcript leaves out ${what}`)
+}
+assertTrue(md.includes("*Thought for "), "transcript notes that it thought")
 
 // --- second send triggers auto-compaction (ctx=700 in the mock model) ---
 await page.getByPlaceholder("Message Kiln…").fill("And which grinder should I get?")

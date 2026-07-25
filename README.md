@@ -57,7 +57,14 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   A meter pill appears at 60% usage for one-tap compaction.
 - **Slash commands** — type `/` in the composer: `/compact [focus]`,
   `/clear` (fresh context, messages kept), `/find [text]`, `/title`,
-  `/model`, `/effort`, `/export`, `/stats`, `/help`.
+  `/model`, `/effort`, `/export [json|md]`, `/stats`, `/help`.
+- **Share a chat as Markdown** — the JSON export exists to round-trip back
+  into Kiln; this is the version for people. **Copy as Markdown** and
+  **Share…** in the chat menu (or `/export md`) produce a readable
+  transcript: turns labelled with the model that answered, artefact bodies
+  in full, "Searched …" steps, and what each reply cost. Hidden mood tags
+  and reasoning traces stay out of it. Available in ghost mode too, where
+  it's the only way to keep anything.
 - **Usage & cost** — every reply records what the provider actually
   reported, never an estimate: tokens in/out (with cached and reasoning
   splits), the exact credits charged on OpenRouter, and generation speed

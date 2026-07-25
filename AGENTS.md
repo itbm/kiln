@@ -96,6 +96,11 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   is untouched); chrome that shouldn't match carries `data-find-skip`, and
   messages carry `data-msg-id` so a sidebar search result can scroll to the
   message it matched (`/chat/:id?m=…&q=…`).
+- `src/lib/transcript.ts` — a chat as human-readable Markdown (copy, share
+  sheet, `/export md`). Built synchronously from the messages already on
+  screen: Safari only permits `navigator.share`/clipboard writes while the
+  tap that asked for them is still the current task, so never `await`
+  anything before calling them.
 - `src/lib/drafts.ts` — unsent composer text, one draft per chat (or a
   `NEW_*_DRAFT` key before the chat exists). Mirrored into the Dexie
   `drafts` store on an idle debounce and flushed on `pagehide` /
