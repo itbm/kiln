@@ -66,6 +66,8 @@ export interface Chat {
   skillIds?: string[]
   /** temporary chats are never written to the database */
   temporary?: boolean
+  /** when the chat was pinned to the top of the list (absent = not pinned) */
+  pinned?: number
   titleIsManual?: boolean
   titleGenerated?: boolean
   /** compaction: summary of messages with createdAt <= summaryCutoff */
@@ -149,6 +151,18 @@ export interface Generation {
   error?: string
   createdAt: number
   usage?: Usage
+}
+
+/**
+ * An unsent composer message. Keyed by chat id (or one of the NEW_*_DRAFT
+ * keys before the chat exists), so a half-written message survives leaving
+ * the chat, a reload, or iOS discarding the PWA in the background.
+ */
+export interface Draft {
+  id: string
+  text: string
+  attachments?: Attachment[]
+  updatedAt: number
 }
 
 export interface Skill {

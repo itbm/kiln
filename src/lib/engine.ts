@@ -141,28 +141,42 @@ export async function sendUserMessage(opts: SendOptions): Promise<void> {
 }
 
 /**
- * Regenerate the last assistant message in place: the current generation is
- * archived as a version and a fresh one streams into the same message.
+ * Regenerate an assistant reply in place: the current generation is archived
+ * as a version and a fresh one streams into the same message.
+ *
+ * Anything after the reply is removed first — those messages answered the
+ * generation being replaced, so they can't stand (the caller confirms with
+ * the user, as editing a user message does).
  */
-export async function regenerateLast(
+export async function regenerateReply(
   chat: Chat,
   history: Message[],
+  target: Message,
   modelRef: ModelRef,
   effort: Effort,
 ): Promise<void> {
-  const last = history[history.length - 1]
-  let reuse: Message | undefined
-  if (last?.role === "assistant") {
-    reuse = last
-    history = history.slice(0, -1)
+  const temporary = !!chat.temporary
+  const idx = history.findIndex((m) => m.id === target.id)
+  if (idx < 0 || target.role !== "assistant") return
+  // if the reply was already compacted away, the summary describes it
+  if (target.createdAt <= (chat.summaryCutoff ?? 0)) {
+    await patchChat(chat, { summary: undefined, summaryCutoff: 0 })
+    chat = { ...chat, summary: undefined, summaryCutoff: 0 }
+  }
+  const after = history.slice(idx + 1)
+  if (after.length) {
+    const ids = after.map((m) => m.id)
+    if (temporary) useTemp.getState().deleteMessages(chat.id, ids)
+    else await db.messages.bulkDelete(ids)
   }
   await patchChat(chat, {
     provider: modelRef.provider,
     model: modelRef.model,
     effort,
+    updatedAt: Date.now(),
   })
   useSettings.getState().set({ lastModel: modelRef, lastEffort: effort })
-  await runAssistantTurn(chat, history, modelRef, effort, reuse)
+  await runAssistantTurn(chat, history.slice(0, idx), modelRef, effort, target)
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { Chat, Message } from "./types"
 import { db, chatMessages } from "./db"
+import { chatToMarkdown } from "./transcript"
 import { getSettings } from "@/stores/settings"
 
 export interface ChatExport {
@@ -21,6 +22,57 @@ export async function exportChatFile(chat: Chat): Promise<void> {
     messages,
   }
   downloadJson(payload, `kiln-chat-${slug(chat.title)}.json`)
+}
+
+/*
+ * Getting a conversation out in a form a person can read. All three take the
+ * messages already on screen and build the transcript synchronously: Safari
+ * only allows share()/clipboard writes while the tap that asked for them is
+ * still the current task, so there is nothing to await first.
+ */
+
+export function chatMarkdownName(chat: Chat): string {
+  return `kiln-chat-${slug(chat.title)}.md`
+}
+
+export function downloadChatMarkdown(chat: Chat, messages: Message[]): void {
+  download(
+    new Blob([chatToMarkdown(chat, messages)], { type: "text/markdown" }),
+    chatMarkdownName(chat),
+  )
+}
+
+export async function copyChatMarkdown(
+  chat: Chat,
+  messages: Message[],
+): Promise<void> {
+  await navigator.clipboard.writeText(chatToMarkdown(chat, messages))
+}
+
+/** Does this device have a share sheet to send the transcript to? */
+export function canShare(): boolean {
+  return typeof navigator.share === "function"
+}
+
+/** Hand the transcript to the OS share sheet. False if the user backed out. */
+export async function shareChatMarkdown(
+  chat: Chat,
+  messages: Message[],
+): Promise<boolean> {
+  const md = chatToMarkdown(chat, messages)
+  const file = new File([md], chatMarkdownName(chat), { type: "text/markdown" })
+  try {
+    await navigator.share(
+      navigator.canShare?.({ files: [file] })
+        ? { files: [file], title: chat.title }
+        : { title: chat.title, text: md },
+    )
+    return true
+  } catch (e) {
+    // dismissing the sheet is not a failure worth shouting about
+    if (e instanceof DOMException && e.name === "AbortError") return false
+    throw e
+  }
 }
 
 export async function exportAllData(): Promise<void> {
@@ -85,9 +137,14 @@ function slug(s: string): string {
 }
 
 function downloadJson(data: unknown, filename: string): void {
-  const url = URL.createObjectURL(
+  download(
     new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
+    filename,
   )
+}
+
+function download(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
   a.download = filename

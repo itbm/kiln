@@ -1,10 +1,11 @@
 import Dexie, { type Table } from "dexie"
 import { contentWithoutArtifacts } from "./artifacts"
-import type { Chat, Message } from "./types"
+import type { Chat, Draft, Message } from "./types"
 
 class KilnDB extends Dexie {
   chats!: Table<Chat, string>
   messages!: Table<Message, string>
+  drafts!: Table<Draft, string>
 
   constructor() {
     // db name predates the Kiln rebrand — kept so existing installs keep their data
@@ -13,6 +14,8 @@ class KilnDB extends Dexie {
       chats: "id, updatedAt, kind",
       messages: "id, chatId, createdAt",
     })
+    // v2: unsent composer drafts, keyed by chat id (see lib/drafts.ts)
+    this.version(2).stores({ drafts: "id" })
   }
 }
 
@@ -34,8 +37,9 @@ export async function recoverInterrupted(): Promise<void> {
 }
 
 export async function deleteChat(chatId: string): Promise<void> {
-  await db.transaction("rw", db.chats, db.messages, async () => {
+  await db.transaction("rw", db.chats, db.messages, db.drafts, async () => {
     await db.messages.where("chatId").equals(chatId).delete()
+    await db.drafts.delete(chatId)
     await db.chats.delete(chatId)
   })
 }

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useChat, useChatMessages } from "@/hooks/use-chat-data"
 import { db, deleteChat } from "@/lib/db"
+import { clearDraft, NEW_IMAGE_DRAFT } from "@/lib/drafts"
 import { confirmDialog } from "@/stores/dialogs"
 import { sendUserMessage } from "@/lib/engine"
 import type { Attachment, Chat, ModelRef } from "@/lib/types"
@@ -109,7 +110,9 @@ export default function ImagesPage() {
                           confirmLabel: "Delete",
                           destructive: true,
                         }).then((ok) => {
-                          if (ok) void deleteChat(chat.id).then(() => navigate("/images"))
+                          if (!ok) return
+                          clearDraft(chat.id)
+                          void deleteChat(chat.id).then(() => navigate("/images"))
                         })
                       }}
                     >
@@ -204,6 +207,7 @@ export default function ImagesPage() {
               onEffortChange={() => {}}
               onSend={(t, a) => void send(t, a)}
               onStop={() => chatId && useStream.getState().stop(chatId)}
+              draftKey={chatId ?? NEW_IMAGE_DRAFT}
             />
           </div>
 

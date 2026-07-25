@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import type { Chat, Message } from "@/lib/types"
 import { db } from "@/lib/db"
+import { persistDraft } from "@/lib/drafts"
 
 /** Temporary chats live here (memory only) and vanish on reload. */
 interface TempState {
@@ -71,6 +72,8 @@ export const useTemp = create<TempState>()((set, get) => ({
       await db.chats.put({ ...chat, temporary: false })
       await db.messages.bulkPut(msgs)
     })
+    // the chat is on disk now, so an unsent draft may be too
+    await persistDraft(id)
     get().remove(id)
   },
 }))

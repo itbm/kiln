@@ -2,7 +2,7 @@
 // Tavily backend. Verifies streaming, the tool loop, artifact parsing,
 // persistence and title generation. Needs `npm run preview` on :4173.
 import { chromium } from "playwright"
-import { mkdirSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
 
 const BASE = "http://localhost:4173"
 mkdirSync("shots", { recursive: true })
@@ -103,6 +103,7 @@ const ctx = await browser.newContext({
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
+  permissions: ["clipboard-read", "clipboard-write"],
 })
 const page = await ctx.newPage()
 
@@ -309,6 +310,33 @@ await page.getByText("Slash commands").waitFor({ timeout: 5000 })
 await page.getByRole("button", { name: "OK" }).click()
 console.log("ok: /help dialog")
 
+// --- the chat as Markdown a person can read ---
+// Export/import is JSON because it round-trips; this is the other direction.
+await page.getByLabel("Chat options").click()
+await page.getByText("Copy as Markdown").click()
+await page.getByText("Chat copied as Markdown").waitFor({ timeout: 5000 })
+const md = await page.evaluate(() => navigator.clipboard.readText())
+writeFileSync("shots/e2e-transcript.md", md) // for eyeballing the formatting
+for (const [needle, what] of [
+  ["# Espresso bean picks", "the chat title as the document title"],
+  ["## You", "your turns"],
+  ["## Assistant · Claude Sonnet 4.5", "the model that answered each turn"],
+  ["*Searched “best espresso beans 2026”*", "the tool steps as the chips said them"],
+  ["**Artefact — Espresso beans — quick guide** (Markdown)", "artefacts, labelled"],
+  ["- **Fresh roast date** beats brand", "the artefact body in full"],
+  ["$0.004", "what the reply cost"],
+]) {
+  assertTrue(md.includes(needle), `transcript carries ${what}`)
+}
+for (const [needle, what] of [
+  ["<artifact", "artefact wire tags"],
+  ["<thoughtful>", "hidden mood tags"],
+  ["The search results mention", "the reasoning trace"],
+]) {
+  assertTrue(!md.includes(needle), `transcript leaves out ${what}`)
+}
+assertTrue(md.includes("*Thought for "), "transcript notes that it thought")
+
 // --- second send triggers auto-compaction (ctx=700 in the mock model) ---
 await page.getByPlaceholder("Message Kiln…").fill("And which grinder should I get?")
 await page.getByLabel("Send").click()
@@ -491,6 +519,327 @@ assertTrue(
   }),
   "jump-to-latest returns to the newest message",
 )
+
+// --- drafts: an unsent message survives leaving the chat and a reload ---
+// A long prompt typed on a phone is precious work; switching chats or iOS
+// discarding the PWA in the background must not eat it.
+const chatUrl = page.url()
+const draftText = "Half-written thought about burr grinder alignment"
+const composer = page.getByPlaceholder("Message Kiln…")
+await composer.fill(draftText)
+await page.locator('input[type="file"]').setInputFiles({
+  name: "notes.txt",
+  mimeType: "text/plain",
+  buffer: Buffer.from("fresh roast dates matter"),
+})
+await page.getByText("notes.txt").waitFor({ timeout: 5000 })
+await page.waitForTimeout(1500) // idle debounce writes it to IndexedDB
+
+// leaving for the new-chat screen must not carry the words across
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await composer.inputValue()) === "",
+  "the previous chat's draft doesn't leak into a new chat",
+)
+
+// ghost mode means ghost mode: a draft typed into a temporary chat is held
+// in memory and never written to disk — until you turn temporary back off
+const storedDrafts = () =>
+  page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    return new Promise((res) => {
+      const r = idb.transaction("drafts", "readonly").objectStore("drafts").getAll()
+      r.onsuccess = () => res(r.result.map((d) => d.text))
+    })
+  })
+await page.getByLabel("More options").click()
+await page.getByText("Temporary chat").click()
+await composer.fill("words typed in ghost mode")
+await page.waitForTimeout(1600)
+assertTrue(
+  !(await storedDrafts()).includes("words typed in ghost mode"),
+  "a draft typed in a temporary chat never reaches the disk",
+)
+await page.getByLabel("More options").click()
+await page.getByText("Disable temporary chat").click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await storedDrafts()).includes("words typed in ghost mode"),
+  "leaving ghost mode puts the draft somewhere a reload will find it",
+)
+await composer.fill("")
+await page.waitForTimeout(600)
+assertTrue(
+  !(await storedDrafts()).includes("words typed in ghost mode"),
+  "emptying the box drops the stored draft",
+)
+
+// cold reload straight back into the chat: text and attachment both return
+await page.goto(chatUrl, { waitUntil: "networkidle" })
+await composer.waitFor({ timeout: 10000 })
+await page.waitForTimeout(600)
+assertTrue(
+  (await composer.inputValue()) === draftText,
+  "draft restored after a cold reload of the chat",
+)
+await page.getByText("notes.txt").waitFor({ timeout: 5000 })
+console.log("ok: the draft's attachment came back with it")
+await page.screenshot({ path: "shots/e2e-draft-restored.png" })
+
+// the chat list says which chats are still holding unsent words
+await page.getByLabel("Open menu").click()
+await drawer
+  .getByText(/Draft · Half-written thought/)
+  .first()
+  .waitFor({ timeout: 5000 })
+console.log("ok: the chat list flags the unsent draft")
+
+// a second conversation, to prove drafts belong to one chat each
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await composer.fill("Tell me about grinders")
+await page.getByLabel("Send").click()
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 20000 })
+await page.waitForTimeout(2500) // let the title call land before renaming
+await composer.fill("/title Grinder talk")
+await page.getByLabel("Send").click()
+await page.getByRole("heading", { name: "Grinder talk" }).waitFor({ timeout: 5000 })
+const draftB = "notes meant only for the second chat"
+await composer.fill(draftB)
+await page.waitForTimeout(1500)
+
+// switching between two open chats: each gets its own words back
+await page.getByLabel("Open menu").click()
+await drawer.getByText("Espresso bean picks").first().click()
+await page.waitForTimeout(800)
+assertTrue(
+  (await composer.inputValue()) === draftText,
+  "switching chats restores that chat's draft, not the one you left",
+)
+await page.getByText("notes.txt").waitFor({ timeout: 5000 })
+await page.getByLabel("Open menu").click()
+await drawer.getByText("Grinder talk").first().click()
+await page.waitForTimeout(800)
+assertTrue(
+  (await composer.inputValue()) === draftB,
+  "and back again — the second chat's draft is intact",
+)
+assertTrue(
+  (await page.getByText("notes.txt").count()) === 0,
+  "attachments stay with their own chat's draft",
+)
+
+// sending clears that chat's draft, and only that one
+await page.getByLabel("Send").click()
+await page.waitForTimeout(1500)
+assertTrue((await composer.inputValue()) === "", "sending empties the composer")
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await drawer.getByText(/Draft · notes meant only/).count()) === 0,
+  "sending clears the stored draft",
+)
+assertTrue(
+  (await drawer.getByText(/Draft · Half-written thought/).count()) === 1,
+  "the other chat's draft is still waiting",
+)
+await page.keyboard.press("Escape")
+await page.waitForTimeout(600)
+
+// --- message times, and a divider when the day changes ---
+const times = await page.locator("[data-ui='app-main'] time").allInnerTexts()
+assertTrue(
+  times.length > 0 && times.every((t) => /^\d{1,2}:\d{2}$/.test(t)),
+  `every message carries its time (${times.slice(0, 3).join(", ")}…)`,
+)
+// backdate the first message of this chat: the list must split by day
+const backdated = await page.evaluate(async () => {
+  const req = indexedDB.open("amber")
+  const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+  const chatId = location.pathname.split("/").pop()
+  const all = await new Promise((res) => {
+    const r = idb.transaction("messages", "readonly").objectStore("messages").getAll()
+    r.onsuccess = () => res(r.result)
+  })
+  const mine = all
+    .filter((m) => m.chatId === chatId)
+    .sort((a, b) => a.createdAt - b.createdAt)
+  if (mine.length < 2) return 0
+  const first = { ...mine[0], createdAt: mine[0].createdAt - 86_400_000 }
+  await new Promise((res) => {
+    const r = idb.transaction("messages", "readwrite").objectStore("messages").put(first)
+    r.onsuccess = () => res()
+  })
+  return mine.length
+})
+assertTrue(backdated >= 2, `backdated the first of ${backdated} messages`)
+await page.reload({ waitUntil: "networkidle" })
+await page.waitForTimeout(800)
+const dividers = (await page.locator("[data-ui='day-divider']").allInnerTexts()).map((t) =>
+  t.trim().toLowerCase(),
+)
+assertTrue(
+  dividers[0] === "yesterday" && dividers[1] === "today",
+  `a divider marks each day (${dividers.join(" / ")})`,
+)
+await page.screenshot({ path: "shots/e2e-day-divider.png" })
+
+// --- branch from a reply: a copy to explore, original untouched ---
+await page.getByLabel("Open menu").click()
+const sourceRow = drawer
+  .locator("[data-ui='chat-row']")
+  .filter({ hasText: "Espresso bean picks" })
+  .filter({ hasNotText: "(branch)" }) // the fork's title contains the original's
+  .first()
+await sourceRow.click()
+await page.waitForTimeout(1000)
+const sourceCount = await page.locator("[data-msg-id]").count()
+assertTrue(sourceCount > 2, `source chat has ${sourceCount} messages to branch from`)
+await page.locator("[aria-label='Branch from here']").first().click()
+await page.getByText("Branched into a new chat").waitFor({ timeout: 5000 })
+await page.waitForTimeout(800)
+await page
+  .getByRole("heading", { name: "Espresso bean picks (branch)" })
+  .waitFor({ timeout: 5000 })
+assertTrue(
+  (await page.locator("[data-msg-id]").count()) === 2,
+  "the branch holds the exchange up to that reply, and no more",
+)
+assertTrue(
+  (await page.getByText("Take a moment; I'm right here.").count()) === 0,
+  "messages after the branch point didn't come along",
+)
+await page.screenshot({ path: "shots/e2e-branch.png" })
+await page.goBack()
+await page.waitForTimeout(1000)
+assertTrue(
+  (await page.locator("[data-msg-id]").count()) === sourceCount,
+  "branching left the original chat exactly as it was",
+)
+
+// --- pin a chat to the top of the list ---
+await page.getByLabel("Open menu").click()
+const branchRow = drawer.locator("[data-ui='chat-row']").filter({ hasText: "(branch)" })
+await branchRow.getByLabel("Chat options").click()
+await page.getByText("Pin to top").click()
+await page.waitForTimeout(700)
+const pinnedGroups = await drawer.locator("[data-ui='sb-group']").allInnerTexts()
+assertTrue(
+  pinnedGroups[0]?.trim().toLowerCase() === "pinned",
+  `the pinned group leads the list (${pinnedGroups.join(" / ")})`,
+)
+assertTrue(
+  (await drawer.locator("[data-ui='sb-group']").first().locator("xpath=..").innerText())
+    .includes("(branch)"),
+  "the pinned chat is the one in it",
+)
+await page.screenshot({ path: "shots/e2e-pinned.png" })
+await page.keyboard.press("Escape")
+await page.waitForTimeout(500)
+await page.reload({ waitUntil: "networkidle" })
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(700)
+assertTrue(
+  (await drawer.locator("[data-ui='sb-group']").allInnerTexts())[0]
+    ?.trim()
+    .toLowerCase() === "pinned",
+  "still pinned after a reload",
+)
+await branchRow.getByLabel("Chat options").click()
+await page.getByText("Unpin").click()
+await page.waitForTimeout(700)
+assertTrue(
+  !(await drawer.locator("[data-ui='sb-group']").allInnerTexts()).some(
+    (g) => g.trim().toLowerCase() === "pinned",
+  ),
+  "unpinning drops the group",
+)
+assertTrue(
+  await page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    const rows = await new Promise((res) => {
+      const r = idb.transaction("chats", "readonly").objectStore("chats").getAll()
+      r.onsuccess = () => res(r.result)
+    })
+    return rows.every((c) => !c.pinned)
+  }),
+  "the unpinned flag is really gone from the record",
+)
+await page.keyboard.press("Escape")
+await page.waitForTimeout(500)
+
+// --- regenerate a reply that isn't the last one ---
+await page.getByLabel("Open menu").click()
+await sourceRow.click()
+await page.waitForTimeout(1000)
+const before = await page.locator("[data-msg-id]").count()
+await page.locator("[aria-label='Regenerate']").first().click()
+const confirmText = await page.locator("[role='dialog']").innerText()
+assertTrue(
+  confirmText.includes(`${before - 2} message`),
+  `the confirm names what it will replace (${/The \d+ messages? after[^.]*\./.exec(confirmText)?.[0] ?? "no count given"})`,
+)
+await page.getByRole("button", { name: "Regenerate" }).click()
+// the truncation and the fresh stream race each other; wait for both
+for (let i = 0; i < 80; i++) {
+  if ((await page.locator("[data-msg-id]").count()) === 2) break
+  await page.waitForTimeout(250)
+}
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 20000 })
+await page.waitForTimeout(1500)
+assertTrue(
+  (await page.locator("[data-msg-id]").count()) === 2,
+  "regenerating mid-chat replaced everything after that reply",
+)
+const switcher = await page.locator("[data-msg-id]").last().innerText()
+assertTrue(
+  /\b[2-9]\/[2-9]\b/.test(switcher),
+  `the replaced attempt is kept as a version (${/\d\/\d/.exec(switcher)?.[0] ?? "no switcher"})`,
+)
+await page.screenshot({ path: "shots/e2e-regen-midchat.png" })
+
+// --- branching a ghost chat stays a ghost ---
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await page.getByLabel("More options").click()
+await page.getByText("Temporary chat").click()
+await composer.fill("A question asked in ghost mode")
+await page.getByLabel("Send").click()
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 20000 })
+await page.waitForTimeout(2500) // let the title call land before renaming
+await composer.fill("/title Ghost chat")
+await page.getByLabel("Send").click()
+await page.getByRole("heading", { name: "Ghost chat" }).waitFor({ timeout: 5000 })
+await page.locator("[aria-label='Branch from here']").first().click()
+await page.getByRole("heading", { name: "Ghost chat (branch)" }).waitFor({ timeout: 5000 })
+await page.waitForTimeout(500)
+assertTrue(
+  await page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    const rows = await new Promise((res) => {
+      const r = idb.transaction("chats", "readonly").objectStore("chats").getAll()
+      r.onsuccess = () => res(r.result)
+    })
+    return rows.every((c) => !c.title.startsWith("Ghost chat"))
+  }),
+  "a branch of a temporary chat never reaches the disk",
+)
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await drawer.locator("[data-ui='sb-group']").allInnerTexts())
+    .map((g) => g.trim().toLowerCase())
+    .includes("temporary"),
+  "both ghosts are listed under Temporary",
+)
+await page.keyboard.press("Escape")
+await page.waitForTimeout(600)
 
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })

@@ -3,14 +3,18 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowDownIcon,
   ChartColumnIcon,
+  ClipboardCopyIcon,
   CloudUploadIcon,
   DownloadIcon,
   GhostIcon,
   KeyIcon,
   MoreVerticalIcon,
   PencilIcon,
+  PinIcon,
+  PinOffIcon,
   ScissorsIcon,
   SearchIcon,
+  Share2Icon,
   SparklesIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -36,13 +40,16 @@ import type { ArtifactBlock } from "@/lib/artifacts"
 import { commandHelpText } from "@/lib/commands"
 import { clearContext, compactChat, estimateWireTokens } from "@/lib/compact"
 import { db, deleteChat } from "@/lib/db"
+import { clearDraft, NEW_CHAT_DRAFT } from "@/lib/drafts"
 import {
   editUserMessage,
   persistMessage,
   regenerateChatTitle,
-  regenerateLast,
+  regenerateReply,
   sendUserMessage,
 } from "@/lib/engine"
+import { branchChat } from "@/lib/branch"
+import { dayLabel, sameDay } from "@/lib/time"
 import {
   findQuestions,
   formatAnswers,
@@ -50,7 +57,14 @@ import {
   type QuestionsBlock,
 } from "@/lib/questions"
 import { revealMessage } from "@/lib/find"
-import { exportChatFile, uploadChatToServer } from "@/lib/sync"
+import {
+  canShare,
+  copyChatMarkdown,
+  downloadChatMarkdown,
+  exportChatFile,
+  shareChatMarkdown,
+  uploadChatToServer,
+} from "@/lib/sync"
 import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
 import { switchToVersion } from "@/lib/versions"
@@ -309,10 +323,45 @@ export default function ChatPage() {
     }
   }
 
-  const retry = () => {
+  /* Any reply can be regenerated, not just the last — but the messages that
+     came after it answered the generation being replaced, so they go too. */
+  const retry = async (msg: Message) => {
     if (!chat || !modelRef || generating) return
+    const idx = messages.findIndex((m) => m.id === msg.id)
+    const after = messages.slice(idx + 1)
+    if (after.length) {
+      const ok = await confirmDialog({
+        title: "Regenerate this reply?",
+        description: `The ${after.length} message${after.length === 1 ? "" : "s"} after this one will be replaced by a new reply.`,
+        confirmLabel: "Regenerate",
+      })
+      if (!ok) return
+    }
     nearBottom.current = true
-    void regenerateLast(chat, messages, modelRef, effort)
+    void regenerateReply(chat, messages, msg, modelRef, effort)
+  }
+
+  /** The non-destructive version: carry on from this reply in a copy. */
+  const branch = async (msg: Message) => {
+    if (!chat) return
+    try {
+      const id = await branchChat(chat, messages, msg)
+      navigate(`/chat/${id}`)
+      toast.success("Branched into a new chat")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't branch this chat")
+    }
+  }
+
+  const togglePin = async () => {
+    if (!chat) return
+    if (chat.temporary) {
+      toast.error("Temporary chats vanish on reload — save it to history first")
+      return
+    }
+    const pinned = chat.pinned ? undefined : Date.now()
+    await db.chats.update(chat.id, { pinned })
+    toast.success(pinned ? "Pinned to the top" : "Unpinned")
   }
 
   const handleSwitchVersion = async (msg: Message, target: number) => {
@@ -388,11 +437,19 @@ export default function ChatPage() {
             .catch((e) => toast.error(e.message))
         }
         break
-      case "export":
-        void exportChatFile(chat)
+      case "export": {
+        const format = (arg ?? "json").toLowerCase()
+        if (format === "md" || format === "markdown")
+          downloadChatMarkdown(chat, messages)
+        else if (format === "json") void exportChatFile(chat)
+        else toast.error("Usage: /export [json|md]")
         break
+      }
       case "stats":
         setStatsOpen(true)
+        break
+      case "pin":
+        void togglePin()
         break
     }
   }
@@ -427,6 +484,7 @@ export default function ChatPage() {
       destructive: true,
     })
     if (!ok) return
+    clearDraft(chat.id)
     if (chat.temporary) useTemp.getState().remove(chat.id)
     else await deleteChat(chat.id)
     navigate("/")
@@ -484,12 +542,45 @@ export default function ChatPage() {
                     <DropdownMenuItem onClick={() => void renameChat()}>
                       <PencilIcon /> Rename
                     </DropdownMenuItem>
+                    {!chat.temporary && (
+                      <DropdownMenuItem onClick={() => void togglePin()}>
+                        {chat.pinned ? (
+                          <>
+                            <PinOffIcon /> Unpin
+                          </>
+                        ) : (
+                          <>
+                            <PinIcon /> Pin to top
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => setFind({ query: "" })}>
                       <SearchIcon /> Find in chat
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setStatsOpen(true)}>
                       <ChartColumnIcon /> Usage & cost
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        copyChatMarkdown(chat, messages)
+                          .then(() => toast.success("Chat copied as Markdown"))
+                          .catch(() => toast.error("Couldn't copy the chat"))
+                      }
+                    >
+                      <ClipboardCopyIcon /> Copy as Markdown
+                    </DropdownMenuItem>
+                    {canShare() && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          shareChatMarkdown(chat, messages).catch((e) =>
+                            toast.error(e instanceof Error ? e.message : "Sharing failed"),
+                          )
+                        }
+                      >
+                        <Share2Icon /> Share…
+                      </DropdownMenuItem>
+                    )}
                     {chat.temporary ? (
                       <DropdownMenuItem
                         onClick={() => {
@@ -549,11 +640,22 @@ export default function ChatPage() {
               <div className="mx-auto max-w-3xl space-y-5 py-4">
                 {messages.map((m, i) => (
                   <Fragment key={m.id}>
+                    {(i === 0 || !sameDay(messages[i - 1].createdAt, m.createdAt)) && (
+                      <div
+                        className="flex items-center gap-2 px-4 text-[11px] text-muted-foreground"
+                        data-ui="day-divider"
+                        data-find-skip
+                      >
+                        <div className="h-px flex-1 bg-border" data-ui="divider-line" />
+                        <span>{dayLabel(m.createdAt)}</span>
+                        <div className="h-px flex-1 bg-border" data-ui="divider-line" />
+                      </div>
+                    )}
                     <MessageView
                       msg={m}
-                      isLast={i === messages.length - 1 && m.role === "assistant"}
                       busy={generating}
-                      onRetry={retry}
+                      onRetry={(msg) => void retry(msg)}
+                      onBranch={(msg) => void branch(msg)}
                       onOpenArtifact={setArtifact}
                       onEditUser={(msg, text) => void handleEditUser(msg, text)}
                       onSwitchVersion={(msg, target) =>
@@ -637,6 +739,8 @@ export default function ChatPage() {
               onSend={(t, a) => void send(t, a)}
               onStop={() => chatId && useStream.getState().stop(chatId)}
               onCommand={handleCommand}
+              draftKey={chatId ?? NEW_CHAT_DRAFT}
+              draftEphemeral={chat?.temporary ?? pendingTemp}
               isNewChat={!chat}
               temporary={pendingTemp}
               onToggleTemporary={() => setPendingTemp((v) => !v)}

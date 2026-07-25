@@ -425,15 +425,17 @@ html.theme-ember [data-ui="q-card"][data-answered="true"] [data-ui="q-ico"] {
   color: var(--ember-sage);
 }
 
-/* compaction divider */
-html.theme-ember [data-ui="compact-divider"] {
+/* compaction + day dividers */
+html.theme-ember [data-ui="compact-divider"],
+html.theme-ember [data-ui="day-divider"] {
   color: var(--ember-ink);
   font-family: "Geist Mono Variable", "Geist Mono", monospace;
   font-size: 9.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-html.theme-ember [data-ui="compact-divider"] [data-ui="divider-line"] {
+html.theme-ember [data-ui="compact-divider"] [data-ui="divider-line"],
+html.theme-ember [data-ui="day-divider"] [data-ui="divider-line"] {
   background: linear-gradient(
     90deg,
     transparent,

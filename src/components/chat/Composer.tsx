@@ -26,6 +26,13 @@ import {
   SLASH_COMMANDS,
   type SlashCommand,
 } from "@/lib/commands"
+import {
+  clearDraft,
+  loadDraft,
+  makeDraftEphemeral,
+  persistDraft,
+  saveDraft,
+} from "@/lib/drafts"
 import { coerceEffort, effortChoices, effortLabel } from "@/lib/effort"
 import type { Attachment, Effort, ModelRef } from "@/lib/types"
 import {
@@ -51,6 +58,10 @@ export interface ComposerProps {
   onStop: () => void
   /** handles non-local slash commands (compact, clear, title, export, help) */
   onCommand?: (name: string, arg?: string) => void
+  /** where unsent text is kept: the chat's id, or a NEW_*_DRAFT key */
+  draftKey: string
+  /** ghost mode — hold the draft in memory, never write it to disk */
+  draftEphemeral?: boolean
   imageMode?: boolean
   /* new-chat extras */
   isNewChat?: boolean
@@ -67,6 +78,59 @@ export function Composer(props: ComposerProps) {
   const [skillsOpen, setSkillsOpen] = useState(false)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  /* Live mirror of what's in the box. The draft store is written from event
+     handlers and async file reads, which can't wait for a re-render. */
+  const draft = useRef({ key: props.draftKey, text: "", attachments })
+
+  const setDraftText = (v: string) => {
+    setText(v)
+    draft.current.text = v
+    saveDraft(draft.current.key, v, draft.current.attachments, props.draftEphemeral)
+  }
+
+  const setDraftAttachments = (next: Attachment[]) => {
+    setAttachments(next)
+    draft.current.attachments = next
+    saveDraft(draft.current.key, draft.current.text, next, props.draftEphemeral)
+  }
+
+  /** the box is now empty and should stay that way: sent, or command run */
+  const emptyComposer = () => {
+    setText("")
+    setAttachments([])
+    draft.current.text = ""
+    draft.current.attachments = []
+    clearDraft(draft.current.key)
+  }
+
+  /* Restore this chat's unsent message, and never carry the previous chat's
+     words across. Runs before any keystroke for the new key can land. */
+  useEffect(() => {
+    const key = props.draftKey
+    draft.current = { key, text: "", attachments: [] }
+    setText("")
+    setAttachments([])
+    let alive = true
+    void loadDraft(key).then((d) => {
+      // don't clobber anything typed while the draft was being read
+      if (!alive || draft.current.key !== key) return
+      if (draft.current.text || draft.current.attachments.length) return
+      if (!d) return
+      draft.current = { key, text: d.text, attachments: d.attachments ?? [] }
+      setText(d.text)
+      setAttachments(d.attachments ?? [])
+    })
+    return () => {
+      alive = false
+    }
+  }, [props.draftKey])
+
+  /* Turning temporary chat on retroactively covers what's already typed;
+     turning it off again puts it back where a reload will find it. */
+  useEffect(() => {
+    if (props.draftEphemeral) makeDraftEphemeral(props.draftKey)
+    else void persistDraft(props.draftKey)
+  }, [props.draftEphemeral, props.draftKey])
 
   const modelInfo = findModel(props.modelRef)
   const efforts = effortChoices(modelInfo)
@@ -111,7 +175,7 @@ export function Composer(props: ComposerProps) {
       toast.error("Commands aren't available here")
       return
     }
-    setText("")
+    emptyComposer()
   }
 
   const send = () => {
@@ -142,8 +206,7 @@ export function Composer(props: ComposerProps) {
       return
     }
     props.onSend(trimmed, attachments)
-    setText("")
-    setAttachments([])
+    emptyComposer()
     taRef.current?.focus()
   }
 
@@ -176,8 +239,8 @@ export function Composer(props: ComposerProps) {
             )
           const raw = await readFileAsDataUrl(file)
           const dataUrl = await downscaleImage(raw)
-          setAttachments((a) => [
-            ...a,
+          setDraftAttachments([
+            ...draft.current.attachments,
             { id: uid(), name: file.name, mime: file.type, size: file.size, kind: "image", dataUrl },
           ])
         } else if (file.type === "application/pdf") {
@@ -187,15 +250,15 @@ export function Composer(props: ComposerProps) {
             )
           if (file.size > 15 * 1024 * 1024) throw new Error("PDF too large (15 MB max)")
           const dataUrl = await readFileAsDataUrl(file)
-          setAttachments((a) => [
-            ...a,
+          setDraftAttachments([
+            ...draft.current.attachments,
             { id: uid(), name: file.name, mime: file.type, size: file.size, kind: "pdf", dataUrl },
           ])
         } else {
           if (file.size > 400 * 1024) throw new Error(`${file.name}: text files up to 400 KB`)
           const content = await readFileAsText(file)
-          setAttachments((a) => [
-            ...a,
+          setDraftAttachments([
+            ...draft.current.attachments,
             { id: uid(), name: file.name, mime: file.type || "text/plain", size: file.size, kind: "text", text: content },
           ])
         }
@@ -220,7 +283,7 @@ export function Composer(props: ComposerProps) {
                 key={c.name}
                 onClick={() => {
                   if (c.args) {
-                    setText(`/${c.name} `)
+                    setDraftText(`/${c.name} `)
                     taRef.current?.focus()
                   } else {
                     runCommand(c)
@@ -263,7 +326,11 @@ export function Composer(props: ComposerProps) {
                 )}
                 <button
                   aria-label="Remove attachment"
-                  onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                  onClick={() =>
+                    setDraftAttachments(
+                      draft.current.attachments.filter((x) => x.id !== a.id),
+                    )
+                  }
                   className="absolute -right-1.5 -top-1.5 rounded-full border border-border bg-background p-0.5 shadow-sm"
                 >
                   <XIcon className="size-3" />
@@ -276,7 +343,7 @@ export function Composer(props: ComposerProps) {
         <textarea
           ref={taRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => setDraftText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !isTouchDevice()) {
               e.preventDefault()

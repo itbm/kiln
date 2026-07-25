@@ -41,6 +41,12 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   (`amber`) and localStorage keys (`amber-settings`, `amber-models-cache`)
   predate the Kiln rebrand and are kept so existing installs keep their
   data. Export files accept both `app: "kiln"` and legacy `"amber"`.
+- **Dexie schema changes are additive**: add a `this.version(n).stores({…})`
+  declaring only the new/changed tables and leave the earlier declarations
+  alone — every install carries the user's entire history. `verify-fresh.mjs`
+  phase 3 seeds a database at the previous schema (Dexie's IDB version is its
+  own version × 10) and proves the upgrade keeps chats and messages; extend
+  it when you bump the version.
 - Model metadata (context length, effort options, capabilities) must come
   from the provider APIs, not hardcoded lists — see
   `src/lib/providers/*.ts`. When `ModelInfo` gains fields, bump
@@ -90,6 +96,23 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   is untouched); chrome that shouldn't match carries `data-find-skip`, and
   messages carry `data-msg-id` so a sidebar search result can scroll to the
   message it matched (`/chat/:id?m=…&q=…`).
+- `src/lib/branch.ts` — fork a chat at one reply (new message ids, original
+  `createdAt` kept; a temporary chat branches into another temporary chat).
+  The non-destructive counterpart to `regenerateReply`, which replaces
+  everything after the reply it re-runs.
+- `src/lib/time.ts` — `clockTime` / `dayLabel` / `sameDay` / `fullDateTime`.
+  All date and time copy goes through here (en-GB), including the transcript
+  header and the chat's day dividers.
+- `src/lib/transcript.ts` — a chat as human-readable Markdown (copy, share
+  sheet, `/export md`). Built synchronously from the messages already on
+  screen: Safari only permits `navigator.share`/clipboard writes while the
+  tap that asked for them is still the current task, so never `await`
+  anything before calling them.
+- `src/lib/drafts.ts` — unsent composer text, one draft per chat (or a
+  `NEW_*_DRAFT` key before the chat exists). Mirrored into the Dexie
+  `drafts` store on an idle debounce and flushed on `pagehide` /
+  backgrounding, because an iOS PWA is usually killed rather than unloaded.
+  Temporary chats are `ephemeral`: cache only, never written to disk.
 - `src/lib/usage.ts` — provider-reported token/cost accounting: per-reply
   `Message.usage` (captured by the engine from stream `done` events, one
   per tool round), formatting, and per-chat totals. Usage is only ever
