@@ -3,6 +3,7 @@ import { db } from "./db"
 import { buildSystemPrompt } from "./prompts"
 import { completeText } from "./providers"
 import { contentWithoutArtifacts } from "./artifacts"
+import { pip } from "@/pip/bus"
 import { getSettings } from "@/stores/settings"
 import { useTemp } from "@/stores/temp"
 
@@ -90,14 +91,22 @@ export async function compactChat(
   user += `Conversation:\n${transcript}`
   if (opts.instructions) user += `\n\nExtra focus requested by the user: ${opts.instructions}`
 
-  let summary = await completeText(ref.provider, {
-    model: ref.model,
-    effort: "auto",
-    messages: [
-      { role: "system", content: SUMMARIZE_PROMPT },
-      { role: "user", content: user },
-    ],
-  })
+  /* Pip sweeps up while the conversation is tidied away (a no-op when he
+     isn't on stage — see src/pip/actions/sweep.ts) */
+  let summary: string
+  pip.tidy(true)
+  try {
+    summary = await completeText(ref.provider, {
+      model: ref.model,
+      effort: "auto",
+      messages: [
+        { role: "system", content: SUMMARIZE_PROMPT },
+        { role: "user", content: user },
+      ],
+    })
+  } finally {
+    pip.tidy(false)
+  }
   summary = summary.replace(/<think>[\s\S]*?<\/think>/g, "").trim()
   if (!summary) throw new Error("Compaction model returned nothing")
 

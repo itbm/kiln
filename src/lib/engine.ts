@@ -30,6 +30,8 @@ const MAX_TOOL_ROUNDS = 8
 const PERSIST_INTERVAL = 700
 /** auto-compact when the estimated prompt exceeds this share of the context */
 const COMPACT_THRESHOLD = 0.7
+/** a turn that dies on one of these spins Pip dizzy rather than flooring him */
+const RATE_LIMITED = /\b429\b|rate.?limit|too many requests|usage limit reached|quota/i
 
 export async function persistMessage(msg: Message, temporary: boolean) {
   if (temporary) useTemp.getState().putMessage({ ...msg })
@@ -404,6 +406,9 @@ async function runAssistantTurn(
     } else {
       finalStatus = "error"
       errorText = e instanceof Error ? e.message : String(e)
+      /* Pip takes it personally: a rate limit spins him dizzy, anything
+         else puts him flat on his back (no-op when he isn't mounted) */
+      pip.mishap(RATE_LIMITED.test(errorText) ? "rate" : "error")
     }
   }
 

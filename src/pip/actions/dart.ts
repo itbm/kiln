@@ -67,6 +67,10 @@ export class DartAction implements PipAction {
       e.actions.build.begin()
       return
     }
+    if (e.spot?.id === "art-easel") {
+      e.actions.paint.begin()
+      return
+    }
     if (e.spot?.zone === "floor") {
       e.actions.patrol.begin()
       return

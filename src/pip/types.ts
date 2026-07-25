@@ -89,8 +89,11 @@ export interface PipAction {
 
 /**
  * A short performance Pip can put on while resting on his home ring —
- * axe throwing today; a Christmas-tree target or snowman juggling later.
- * Each ring act lives in its own file under src/pip/actions/.
+ * axe throwing, the tightrope, juggling embers. Each ring act lives in its
+ * own file under src/pip/actions/. Scenery goes in props (SceneProp, drawn
+ * behind him); the optional pose/drawFront hooks mirror PipAction's and are
+ * how an act poses his arms and draws what he holds (RestAction forwards
+ * them to whichever act is running).
  */
 export interface RingAct {
   id: string
@@ -100,6 +103,10 @@ export interface RingAct {
   start(t: number): void
   /** advance; set engine.act = "" when done */
   update(dt: number, t: number): void
+  /** contribute to the final pose just before Pip is drawn */
+  pose?(pose: PipPose, t: number): void
+  /** front layer: drawn after Pip, over his body (a balance pole, embers) */
+  drawFront?(t: number, pose: PipPose): void
   /** act is being cancelled (fast = fade props out rather than pop) */
   cancel(fast: boolean): void
 }

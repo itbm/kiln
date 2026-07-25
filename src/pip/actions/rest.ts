@@ -1,6 +1,6 @@
 import { resolveSpot } from "../anchors"
 import type { PipEngine } from "../engine"
-import type { PipAction } from "../types"
+import type { PipAction, PipPose } from "../types"
 
 /**
  * Resting on a perch: breathe, hold position against layout shifts, dodge
@@ -10,6 +10,12 @@ import type { PipAction } from "../types"
 export class RestAction implements PipAction {
   id = "rest"
   constructor(private e: PipEngine) {}
+
+  /** the ring act currently on stage, if any */
+  private act() {
+    const e = this.e
+    return e.act ? e.actions.ringActs.find((a) => a.id === e.act) : undefined
+  }
 
   update(dt: number, t: number) {
     const e = this.e
@@ -54,9 +60,17 @@ export class RestAction implements PipAction {
         e.clearAct(true)
       }
     }
-    if (e.act !== "") {
-      const act = e.actions.ringActs.find((a) => a.id === e.act)
-      act?.update(dt, t)
-    }
+    this.act()?.update(dt, t)
+  }
+
+  /* a ring act owns his arms and his front layer while it runs (the
+     tightrope's balance pole, the juggled embers) */
+
+  pose(pose: PipPose, t: number) {
+    this.act()?.pose?.(pose, t)
+  }
+
+  drawFront(t: number, pose: PipPose) {
+    this.act()?.drawFront?.(t, pose)
   }
 }

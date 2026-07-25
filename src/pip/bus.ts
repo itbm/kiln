@@ -8,6 +8,8 @@ export interface PipHandle {
   celebrate(): void
   flareUp(): void
   emote(emotion: string): void
+  tidy(on: boolean): void
+  mishap(kind: string): void
   drawerOpening(): void
   drawerClosing(): void
 }
@@ -29,13 +31,23 @@ export const pip = {
   flare: () => current?.flareUp(),
   /** the reply's hidden <emotion> tag arrived (see src/lib/emotions.ts) */
   emote: (emotion: string) => current?.emote(emotion),
+  /** a compaction started (true) or finished (false) — he sweeps up while
+      the conversation is being tidied into a summary */
+  tidy: (on: boolean) => current?.tidy(on),
+  /** the turn fell over: "rate" (a 429) spins him dizzy, anything else
+      knocks him out cold */
+  mishap: (kind: "rate" | "error") => current?.mishap(kind),
   /** the sidebar drawer is sliding open (Pip may get clobbered) */
   drawerOpening: () => current?.drawerOpening(),
   /** the sidebar drawer was dismissed (Pip jets over to shove it shut) */
   drawerClosing: () => current?.drawerClosing(),
 }
 
-/* dev-only handle for poking moods from the console:
-   __pip.emote("crying") */
+/* dev-only handle for poking Pip from the console:
+   __pip.emote("crying"), __pip.mishap("rate"), __pip.tidy(true) — and
+   engine() for driving an action directly, e.g. starting a named ring act */
 if (import.meta.env.DEV)
-  (window as unknown as { __pip: typeof pip }).__pip = pip
+  (window as unknown as { __pip: unknown }).__pip = {
+    ...pip,
+    engine: () => current,
+  }
