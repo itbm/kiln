@@ -649,6 +649,198 @@ assertTrue(
 await page.keyboard.press("Escape")
 await page.waitForTimeout(600)
 
+// --- message times, and a divider when the day changes ---
+const times = await page.locator("[data-ui='app-main'] time").allInnerTexts()
+assertTrue(
+  times.length > 0 && times.every((t) => /^\d{1,2}:\d{2}$/.test(t)),
+  `every message carries its time (${times.slice(0, 3).join(", ")}…)`,
+)
+// backdate the first message of this chat: the list must split by day
+const backdated = await page.evaluate(async () => {
+  const req = indexedDB.open("amber")
+  const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+  const chatId = location.pathname.split("/").pop()
+  const all = await new Promise((res) => {
+    const r = idb.transaction("messages", "readonly").objectStore("messages").getAll()
+    r.onsuccess = () => res(r.result)
+  })
+  const mine = all
+    .filter((m) => m.chatId === chatId)
+    .sort((a, b) => a.createdAt - b.createdAt)
+  if (mine.length < 2) return 0
+  const first = { ...mine[0], createdAt: mine[0].createdAt - 86_400_000 }
+  await new Promise((res) => {
+    const r = idb.transaction("messages", "readwrite").objectStore("messages").put(first)
+    r.onsuccess = () => res()
+  })
+  return mine.length
+})
+assertTrue(backdated >= 2, `backdated the first of ${backdated} messages`)
+await page.reload({ waitUntil: "networkidle" })
+await page.waitForTimeout(800)
+const dividers = (await page.locator("[data-ui='day-divider']").allInnerTexts()).map((t) =>
+  t.trim().toLowerCase(),
+)
+assertTrue(
+  dividers[0] === "yesterday" && dividers[1] === "today",
+  `a divider marks each day (${dividers.join(" / ")})`,
+)
+await page.screenshot({ path: "shots/e2e-day-divider.png" })
+
+// --- branch from a reply: a copy to explore, original untouched ---
+await page.getByLabel("Open menu").click()
+const sourceRow = drawer
+  .locator("[data-ui='chat-row']")
+  .filter({ hasText: "Espresso bean picks" })
+  .filter({ hasNotText: "(branch)" }) // the fork's title contains the original's
+  .first()
+await sourceRow.click()
+await page.waitForTimeout(1000)
+const sourceCount = await page.locator("[data-msg-id]").count()
+assertTrue(sourceCount > 2, `source chat has ${sourceCount} messages to branch from`)
+await page.locator("[aria-label='Branch from here']").first().click()
+await page.getByText("Branched into a new chat").waitFor({ timeout: 5000 })
+await page.waitForTimeout(800)
+await page
+  .getByRole("heading", { name: "Espresso bean picks (branch)" })
+  .waitFor({ timeout: 5000 })
+assertTrue(
+  (await page.locator("[data-msg-id]").count()) === 2,
+  "the branch holds the exchange up to that reply, and no more",
+)
+assertTrue(
+  (await page.getByText("Take a moment; I'm right here.").count()) === 0,
+  "messages after the branch point didn't come along",
+)
+await page.screenshot({ path: "shots/e2e-branch.png" })
+await page.goBack()
+await page.waitForTimeout(1000)
+assertTrue(
+  (await page.locator("[data-msg-id]").count()) === sourceCount,
+  "branching left the original chat exactly as it was",
+)
+
+// --- pin a chat to the top of the list ---
+await page.getByLabel("Open menu").click()
+const branchRow = drawer.locator("[data-ui='chat-row']").filter({ hasText: "(branch)" })
+await branchRow.getByLabel("Chat options").click()
+await page.getByText("Pin to top").click()
+await page.waitForTimeout(700)
+const pinnedGroups = await drawer.locator("[data-ui='sb-group']").allInnerTexts()
+assertTrue(
+  pinnedGroups[0]?.trim().toLowerCase() === "pinned",
+  `the pinned group leads the list (${pinnedGroups.join(" / ")})`,
+)
+assertTrue(
+  (await drawer.locator("[data-ui='sb-group']").first().locator("xpath=..").innerText())
+    .includes("(branch)"),
+  "the pinned chat is the one in it",
+)
+await page.screenshot({ path: "shots/e2e-pinned.png" })
+await page.keyboard.press("Escape")
+await page.waitForTimeout(500)
+await page.reload({ waitUntil: "networkidle" })
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(700)
+assertTrue(
+  (await drawer.locator("[data-ui='sb-group']").allInnerTexts())[0]
+    ?.trim()
+    .toLowerCase() === "pinned",
+  "still pinned after a reload",
+)
+await branchRow.getByLabel("Chat options").click()
+await page.getByText("Unpin").click()
+await page.waitForTimeout(700)
+assertTrue(
+  !(await drawer.locator("[data-ui='sb-group']").allInnerTexts()).some(
+    (g) => g.trim().toLowerCase() === "pinned",
+  ),
+  "unpinning drops the group",
+)
+assertTrue(
+  await page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    const rows = await new Promise((res) => {
+      const r = idb.transaction("chats", "readonly").objectStore("chats").getAll()
+      r.onsuccess = () => res(r.result)
+    })
+    return rows.every((c) => !c.pinned)
+  }),
+  "the unpinned flag is really gone from the record",
+)
+await page.keyboard.press("Escape")
+await page.waitForTimeout(500)
+
+// --- regenerate a reply that isn't the last one ---
+await page.getByLabel("Open menu").click()
+await sourceRow.click()
+await page.waitForTimeout(1000)
+const before = await page.locator("[data-msg-id]").count()
+await page.locator("[aria-label='Regenerate']").first().click()
+const confirmText = await page.locator("[role='dialog']").innerText()
+assertTrue(
+  confirmText.includes(`${before - 2} message`),
+  `the confirm names what it will replace (${/The \d+ messages? after[^.]*\./.exec(confirmText)?.[0] ?? "no count given"})`,
+)
+await page.getByRole("button", { name: "Regenerate" }).click()
+// the truncation and the fresh stream race each other; wait for both
+for (let i = 0; i < 80; i++) {
+  if ((await page.locator("[data-msg-id]").count()) === 2) break
+  await page.waitForTimeout(250)
+}
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 20000 })
+await page.waitForTimeout(1500)
+assertTrue(
+  (await page.locator("[data-msg-id]").count()) === 2,
+  "regenerating mid-chat replaced everything after that reply",
+)
+const switcher = await page.locator("[data-msg-id]").last().innerText()
+assertTrue(
+  /\b[2-9]\/[2-9]\b/.test(switcher),
+  `the replaced attempt is kept as a version (${/\d\/\d/.exec(switcher)?.[0] ?? "no switcher"})`,
+)
+await page.screenshot({ path: "shots/e2e-regen-midchat.png" })
+
+// --- branching a ghost chat stays a ghost ---
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await page.getByLabel("More options").click()
+await page.getByText("Temporary chat").click()
+await composer.fill("A question asked in ghost mode")
+await page.getByLabel("Send").click()
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 20000 })
+await page.waitForTimeout(2500) // let the title call land before renaming
+await composer.fill("/title Ghost chat")
+await page.getByLabel("Send").click()
+await page.getByRole("heading", { name: "Ghost chat" }).waitFor({ timeout: 5000 })
+await page.locator("[aria-label='Branch from here']").first().click()
+await page.getByRole("heading", { name: "Ghost chat (branch)" }).waitFor({ timeout: 5000 })
+await page.waitForTimeout(500)
+assertTrue(
+  await page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    const rows = await new Promise((res) => {
+      const r = idb.transaction("chats", "readonly").objectStore("chats").getAll()
+      r.onsuccess = () => res(r.result)
+    })
+    return rows.every((c) => !c.title.startsWith("Ghost chat"))
+  }),
+  "a branch of a temporary chat never reaches the disk",
+)
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await drawer.locator("[data-ui='sb-group']").allInnerTexts())
+    .map((g) => g.trim().toLowerCase())
+    .includes("temporary"),
+  "both ghosts are listed under Temporary",
+)
+await page.keyboard.press("Escape")
+await page.waitForTimeout(600)
+
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })
 await page.getByRole("button", { name: "Check for updates" }).click()

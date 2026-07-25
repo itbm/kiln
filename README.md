@@ -41,7 +41,8 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
 ## Features
 
 - **Chat & history** — streaming markdown chat with code highlighting, tables,
-  chat list grouped by day, rename, delete, export/import (JSON), and
+  chat list grouped by day with the ones you **pin** held at the top, rename,
+  delete, export/import (JSON), and
   **full-text search** across every message (with snippets). Opening a hit
   **lands on the message that matched** — it scrolls into the middle of the
   view and flashes — instead of dumping you at the bottom of a long chat.
@@ -57,7 +58,7 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   A meter pill appears at 60% usage for one-tap compaction.
 - **Slash commands** — type `/` in the composer: `/compact [focus]`,
   `/clear` (fresh context, messages kept), `/find [text]`, `/title`,
-  `/model`, `/effort`, `/export [json|md]`, `/stats`, `/help`.
+  `/model`, `/effort`, `/export [json|md]`, `/stats`, `/pin`, `/help`.
 - **Share a chat as Markdown** — the JSON export exists to round-trip back
   into Kiln; this is the version for people. **Copy as Markdown** and
   **Share…** in the chat menu (or `/export md`) produce a readable
@@ -72,9 +73,17 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   **Usage & cost** in the chat menu (or `/stats`) totals the whole chat —
   regenerated attempts included, per model.
 - **Message editing & versions** — edit any of your messages and resend
-  (later messages are replaced after a confirm); regenerating a reply keeps
-  every attempt with a Claude-style ‹ 1/2 › version switcher, including
+  (later messages are replaced after a confirm); **any** reply can be
+  regenerated, not just the last — mid-conversation it confirms first, since
+  the messages that followed answered the version being replaced. Every
+  attempt is kept behind a Claude-style ‹ 1/2 › version switcher, including
   when you switch model between attempts.
+- **Branch from a reply** — the non-destructive way out of the same corner:
+  copy the conversation up to that reply into a new chat and carry on there,
+  leaving the original untouched. Branching a temporary chat gives you
+  another temporary chat.
+- **Times** — every message shows when it was sent (the full date on hover),
+  and a divider marks each new day in a conversation that spans several.
 - **Drafts that survive** — an unsent message (with its attachments) stays
   with the chat you were writing it in: leave for another chat and come back,
   reload, or let iOS discard the app in the background, and the words are

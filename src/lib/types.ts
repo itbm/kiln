@@ -66,6 +66,8 @@ export interface Chat {
   skillIds?: string[]
   /** temporary chats are never written to the database */
   temporary?: boolean
+  /** when the chat was pinned to the top of the list (absent = not pinned) */
+  pinned?: number
   titleIsManual?: boolean
   titleGenerated?: boolean
   /** compaction: summary of messages with createdAt <= summaryCutoff */

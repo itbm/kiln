@@ -96,6 +96,13 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   is untouched); chrome that shouldn't match carries `data-find-skip`, and
   messages carry `data-msg-id` so a sidebar search result can scroll to the
   message it matched (`/chat/:id?m=…&q=…`).
+- `src/lib/branch.ts` — fork a chat at one reply (new message ids, original
+  `createdAt` kept; a temporary chat branches into another temporary chat).
+  The non-destructive counterpart to `regenerateReply`, which replaces
+  everything after the reply it re-runs.
+- `src/lib/time.ts` — `clockTime` / `dayLabel` / `sameDay` / `fullDateTime`.
+  All date and time copy goes through here (en-GB), including the transcript
+  header and the chat's day dividers.
 - `src/lib/transcript.ts` — a chat as human-readable Markdown (copy, share
   sheet, `/export md`). Built synchronously from the messages already on
   screen: Safari only permits `navigator.share`/clipboard writes while the

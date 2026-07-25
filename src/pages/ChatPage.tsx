@@ -10,6 +10,8 @@ import {
   KeyIcon,
   MoreVerticalIcon,
   PencilIcon,
+  PinIcon,
+  PinOffIcon,
   ScissorsIcon,
   SearchIcon,
   Share2Icon,
@@ -43,9 +45,11 @@ import {
   editUserMessage,
   persistMessage,
   regenerateChatTitle,
-  regenerateLast,
+  regenerateReply,
   sendUserMessage,
 } from "@/lib/engine"
+import { branchChat } from "@/lib/branch"
+import { dayLabel, sameDay } from "@/lib/time"
 import {
   findQuestions,
   formatAnswers,
@@ -319,10 +323,45 @@ export default function ChatPage() {
     }
   }
 
-  const retry = () => {
+  /* Any reply can be regenerated, not just the last — but the messages that
+     came after it answered the generation being replaced, so they go too. */
+  const retry = async (msg: Message) => {
     if (!chat || !modelRef || generating) return
+    const idx = messages.findIndex((m) => m.id === msg.id)
+    const after = messages.slice(idx + 1)
+    if (after.length) {
+      const ok = await confirmDialog({
+        title: "Regenerate this reply?",
+        description: `The ${after.length} message${after.length === 1 ? "" : "s"} after this one will be replaced by a new reply.`,
+        confirmLabel: "Regenerate",
+      })
+      if (!ok) return
+    }
     nearBottom.current = true
-    void regenerateLast(chat, messages, modelRef, effort)
+    void regenerateReply(chat, messages, msg, modelRef, effort)
+  }
+
+  /** The non-destructive version: carry on from this reply in a copy. */
+  const branch = async (msg: Message) => {
+    if (!chat) return
+    try {
+      const id = await branchChat(chat, messages, msg)
+      navigate(`/chat/${id}`)
+      toast.success("Branched into a new chat")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't branch this chat")
+    }
+  }
+
+  const togglePin = async () => {
+    if (!chat) return
+    if (chat.temporary) {
+      toast.error("Temporary chats vanish on reload — save it to history first")
+      return
+    }
+    const pinned = chat.pinned ? undefined : Date.now()
+    await db.chats.update(chat.id, { pinned })
+    toast.success(pinned ? "Pinned to the top" : "Unpinned")
   }
 
   const handleSwitchVersion = async (msg: Message, target: number) => {
@@ -408,6 +447,9 @@ export default function ChatPage() {
       }
       case "stats":
         setStatsOpen(true)
+        break
+      case "pin":
+        void togglePin()
         break
     }
   }
@@ -500,6 +542,19 @@ export default function ChatPage() {
                     <DropdownMenuItem onClick={() => void renameChat()}>
                       <PencilIcon /> Rename
                     </DropdownMenuItem>
+                    {!chat.temporary && (
+                      <DropdownMenuItem onClick={() => void togglePin()}>
+                        {chat.pinned ? (
+                          <>
+                            <PinOffIcon /> Unpin
+                          </>
+                        ) : (
+                          <>
+                            <PinIcon /> Pin to top
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => setFind({ query: "" })}>
                       <SearchIcon /> Find in chat
                     </DropdownMenuItem>
@@ -585,11 +640,22 @@ export default function ChatPage() {
               <div className="mx-auto max-w-3xl space-y-5 py-4">
                 {messages.map((m, i) => (
                   <Fragment key={m.id}>
+                    {(i === 0 || !sameDay(messages[i - 1].createdAt, m.createdAt)) && (
+                      <div
+                        className="flex items-center gap-2 px-4 text-[11px] text-muted-foreground"
+                        data-ui="day-divider"
+                        data-find-skip
+                      >
+                        <div className="h-px flex-1 bg-border" data-ui="divider-line" />
+                        <span>{dayLabel(m.createdAt)}</span>
+                        <div className="h-px flex-1 bg-border" data-ui="divider-line" />
+                      </div>
+                    )}
                     <MessageView
                       msg={m}
-                      isLast={i === messages.length - 1 && m.role === "assistant"}
                       busy={generating}
-                      onRetry={retry}
+                      onRetry={(msg) => void retry(msg)}
+                      onBranch={(msg) => void branch(msg)}
                       onOpenArtifact={setArtifact}
                       onEditUser={(msg, text) => void handleEditUser(msg, text)}
                       onSwitchVersion={(msg, target) =>

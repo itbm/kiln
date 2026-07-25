@@ -10,6 +10,8 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PencilLineIcon,
+  PinIcon,
+  PinOffIcon,
   SearchIcon,
   SettingsIcon,
   SquarePenIcon,
@@ -36,6 +38,17 @@ import { cn } from "@/lib/utils"
 import { confirmDialog, promptDialog } from "@/stores/dialogs"
 import { useSettings } from "@/stores/settings"
 import { useTemp } from "@/stores/temp"
+
+/** Pinned chats sit above the ghosts, which sit above the day buckets. */
+const GROUP_ORDER = [
+  "Pinned",
+  "Temporary",
+  "Today",
+  "Yesterday",
+  "Previous 7 days",
+  "Previous 30 days",
+  "Older",
+]
 
 function groupLabel(ts: number): string {
   const now = new Date()
@@ -173,6 +186,23 @@ function ChatRow({
             </DropdownMenuItem>
           ) : (
             <>
+              <DropdownMenuItem
+                onClick={() =>
+                  void db.chats.update(chat.id, {
+                    pinned: chat.pinned ? undefined : Date.now(),
+                  })
+                }
+              >
+                {chat.pinned ? (
+                  <>
+                    <PinOffIcon /> Unpin
+                  </>
+                ) : (
+                  <>
+                    <PinIcon /> Pin to top
+                  </>
+                )}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void exportChatFile(chat)}>
                 <DownloadIcon /> Export JSON
               </DropdownMenuItem>
@@ -231,12 +261,20 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     )
     const out: { label: string; chats: Chat[] }[] = []
     for (const c of filtered) {
-      const label = c.temporary ? "Temporary" : groupLabel(c.updatedAt)
+      const label = c.pinned
+        ? "Pinned"
+        : c.temporary
+          ? "Temporary"
+          : groupLabel(c.updatedAt)
       const g = out.find((x) => x.label === label)
       if (g) g.chats.push(c)
       else out.push({ label, chats: [c] })
     }
-    return out
+    // chats arrive newest-first, so groups appear in date order already —
+    // except Pinned, which can be seeded by a chat of any age
+    return out.sort(
+      (a, b) => GROUP_ORDER.indexOf(a.label) - GROUP_ORDER.indexOf(b.label),
+    )
   }, [chats, query, contentHits])
 
   return (

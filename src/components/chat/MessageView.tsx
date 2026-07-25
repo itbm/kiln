@@ -6,6 +6,7 @@ import {
   CircleStopIcon,
   CopyIcon,
   FileIcon,
+  GitBranchIcon,
   PencilIcon,
   RefreshCwIcon,
   TriangleAlertIcon,
@@ -13,6 +14,7 @@ import {
 import type { Message } from "@/lib/types"
 import { splitContent, type ArtifactBlock } from "@/lib/artifacts"
 import { effortCaption } from "@/lib/effort"
+import { clockTime, fullDateTime } from "@/lib/time"
 import { usageCaption, usageDetail } from "@/lib/usage"
 import { activeVersionIndex, versionCount } from "@/lib/versions"
 import { cn } from "@/lib/utils"
@@ -39,6 +41,19 @@ function ModelCaption({ msg }: { msg: Message }) {
   )
 }
 
+/** When the message happened; the full date is a hover away. */
+function MessageTime({ ts, className }: { ts: number; className?: string }) {
+  return (
+    <time
+      dateTime={new Date(ts).toISOString()}
+      title={fullDateTime(ts)}
+      className={cn("shrink-0 tabular-nums", className)}
+    >
+      {clockTime(ts)}
+    </time>
+  )
+}
+
 /** Cost (or tokens) of the active generation; tap for the full breakdown. */
 function UsageCaption({ msg }: { msg: Message }) {
   const [expanded, setExpanded] = useState(false)
@@ -47,7 +62,8 @@ function UsageCaption({ msg }: { msg: Message }) {
   if (!text) return null
   return (
     <>
-      {(msg.modelName ?? msg.model) && <span aria-hidden>·</span>}
+      {/* the time always precedes it, so the separator is unconditional */}
+      <span aria-hidden>·</span>
       <button
         type="button"
         aria-label={expanded ? "Hide usage details" : "Show tokens and cost"}
@@ -158,6 +174,7 @@ function UserMessage({
             data-find-skip
             className="flex items-center gap-0.5 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 max-md:opacity-60"
           >
+            <MessageTime ts={msg.createdAt} className="mr-1" />
             {msg.editedAt && <span className="mr-1">edited</span>}
             <CopyIconButton text={msg.content} />
             {onEdit && !busy && (
@@ -182,18 +199,20 @@ function UserMessage({
 
 export const MessageView = memo(function MessageView({
   msg,
-  isLast,
   busy = false,
   onRetry,
+  onBranch,
   onOpenArtifact,
   onEditUser,
   onSwitchVersion,
   onOpenQuestions,
 }: {
   msg: Message
-  isLast: boolean
   busy?: boolean
-  onRetry?: () => void
+  /** regenerate this reply (any of them, not just the last) */
+  onRetry?: (msg: Message) => void
+  /** copy the chat up to this reply into a new one */
+  onBranch?: (msg: Message) => void
   onOpenArtifact: (a: ArtifactBlock) => void
   onEditUser?: (msg: Message, text: string) => void
   onSwitchVersion?: (msg: Message, target: number) => void
@@ -333,17 +352,29 @@ export const MessageView = memo(function MessageView({
             </span>
           )}
           <ModelCaption msg={msg} />
+          {(msg.modelName ?? msg.model) && <span aria-hidden>·</span>}
+          <MessageTime ts={msg.createdAt} />
           <UsageCaption msg={msg} />
           <div className="ml-auto flex items-center opacity-70 transition-opacity group-hover:opacity-100">
             {(content || reasoning) && <CopyIconButton text={content} />}
-            {isLast && onRetry && !busy && (
+            {onRetry && !busy && (
               <Button
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Regenerate"
-                onClick={onRetry}
+                onClick={() => onRetry(msg)}
               >
                 <RefreshCwIcon />
+              </Button>
+            )}
+            {onBranch && !busy && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Branch from here"
+                onClick={() => onBranch(msg)}
+              >
+                <GitBranchIcon />
               </Button>
             )}
           </div>

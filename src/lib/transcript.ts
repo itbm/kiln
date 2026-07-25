@@ -1,5 +1,6 @@
 import { splitContent } from "./artifacts"
 import { effortCaption } from "./effort"
+import { fullDateTime } from "./time"
 import type { Chat, Message, ToolStep } from "./types"
 import { chatUsageTotals, usageDetail } from "./usage"
 import { formatBytes } from "./utils"
@@ -67,19 +68,9 @@ function attachmentLine(m: Message): string | null {
   return `*Attached: ${each.join(", ")}*`
 }
 
-function dateLine(ts: number): string {
-  return new Date(ts).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
 export function chatToMarkdown(chat: Chat, messages: Message[]): string {
   const out: string[] = [`# ${chat.title}`, ""]
-  out.push(`*${chat.kind === "image" ? "Images session" : "Chat"} · ${dateLine(chat.createdAt)} · exported from Kiln*`)
+  out.push(`*${chat.kind === "image" ? "Images session" : "Chat"} · ${fullDateTime(chat.createdAt)} · exported from Kiln*`)
   out.push("", "---", "")
 
   for (const m of messages) {
