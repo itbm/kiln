@@ -40,6 +40,14 @@ export function rectOfEl(el: Element | null): Rect | null {
 
 const q = (sel: string) => document.querySelector(sel)
 
+/**
+ * The ledge Pip walks along at the bottom of a chat. Normally the top edge
+ * of the composer, but anything docked above it (the find bar) claims the
+ * ledge while it's up, so he stands on that instead of over its buttons.
+ */
+const ledgeEl = () =>
+  q('[data-pip-spot="ledge"]') ?? q('[data-pip-spot="composer"]')
+
 export const drawerEl = () =>
   q('[data-slot="drawer-content"][data-vaul-drawer-direction="left"]')
 
@@ -85,7 +93,7 @@ export function ovKey(): string {
 export function zoneResolve(sp: Spot, env: AnchorEnv): ZonePoint | null {
   const S = baseS(env.W, env.H)
   if (sp.zone === "floor") {
-    const c = rectOfEl(q('[data-pip-spot="composer"]'))
+    const c = rectOfEl(ledgeEl())
     if (!c) return null
     const minX = c.left + 26
     const maxX = c.right - 26
@@ -128,7 +136,7 @@ function siteSpot(env: AnchorEnv, sel: string, id: string, s: number): Spot | nu
   )
     return null
   const r = rectOfEl(q(sel))
-  const comp = rectOfEl(q('[data-pip-spot="composer"]'))
+  const comp = rectOfEl(ledgeEl())
   if (!r || !comp) return null
   const S = baseS(env.W, env.H)
   if (r.top < 70 || r.top > comp.top - S * 1.4) return null
@@ -251,7 +259,7 @@ export function elSpots(env: AnchorEnv): Spot[] {
        the line above the textarea (patrol.ts slows down on calm spots) */
     add(
       "composer",
-      composer,
+      ledgeEl(),
       (r) => ({ x: r.right - S * 0.8, y: r.top - S * 0.5, s: 0.8 }),
       { w: 3, home: true, calm: true },
     )

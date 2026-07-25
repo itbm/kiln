@@ -196,6 +196,13 @@ await page.route("**/api.tavily.com/search", (route) =>
 const errors = []
 page.on("pageerror", (e) => errors.push(e.message))
 
+const assertTrue = (cond, msg) => {
+  if (!cond) {
+    console.error("ASSERT FAIL:", msg)
+    process.exitCode = 1
+  } else console.log("ok:", msg)
+}
+
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
 
 // --- Pip stays on screen when the opening sidebar clobbers him ---
@@ -411,6 +418,80 @@ if (tearPx < 12) {
   process.exitCode = 1
 } else console.log(`ok: sad mood wells up visible tears (${tearPx} blue px)`)
 
+// --- find in chat, and a search result that lands on its message ---
+// An installed PWA has no browser find-in-page, so this is the only way
+// around a long conversation.
+await page.getByPlaceholder("Message Kiln…").fill("/find espresso")
+await page.getByLabel("Send").click()
+await page.getByLabel("Find in chat").waitFor({ timeout: 5000 })
+await page.waitForTimeout(600)
+const findCount = page.locator("[data-ui='find-count']")
+const firstMatch = await findCount.innerText()
+assertTrue(
+  Number(firstMatch.split("/")[1]) >= 2,
+  `/find highlighted ${firstMatch.split("/")[1]} matches for "espresso"`,
+)
+assertTrue(
+  (await page.evaluate(() => CSS.highlights?.size ?? -1)) >= 1,
+  "matches painted through the CSS Custom Highlight API",
+)
+await page.getByLabel("Next match").click()
+await page.waitForTimeout(500)
+const nextMatch = await findCount.innerText()
+assertTrue(
+  nextMatch !== firstMatch,
+  `stepping advances the current match (${firstMatch} → ${nextMatch})`,
+)
+await page.screenshot({ path: "shots/e2e-find.png" })
+await page.getByLabel("Close find").click()
+await page.waitForTimeout(300)
+assertTrue(
+  (await page.evaluate(() => CSS.highlights?.size ?? -1)) === 0,
+  "closing the bar clears the paint",
+)
+
+// searching the sidebar and opening the hit must land ON the message
+await page.getByLabel("Open menu").click()
+await page.getByPlaceholder("Search chats").fill("Moka")
+await page.waitForTimeout(800)
+const drawer = page.locator("[data-slot='drawer-content']")
+await drawer.getByText(/Moka pot/).first().waitFor({ timeout: 5000 })
+console.log("ok: sidebar search shows a snippet of the matching message")
+await drawer.getByText("Espresso bean picks").first().click()
+await page.waitForTimeout(1200)
+const landed = await page.evaluate(() => {
+  const el = document.querySelector("[data-ui='app-main'] .overflow-y-auto")
+  return {
+    gap: Math.round(
+      (el?.scrollHeight ?? 0) - (el?.scrollTop ?? 0) - (el?.clientHeight ?? 0),
+    ),
+    query: document.querySelector("[data-ui='find-bar'] input")?.value,
+    flashed: !!document.querySelector(".find-flash"),
+    jump: !!document.querySelector("[data-ui='jump-latest']"),
+    search: location.search,
+  }
+})
+assertTrue(landed.query === "Moka", "find bar opens primed with the searched text")
+assertTrue(landed.flashed, "the matching message flashes so the eye finds it")
+assertTrue(
+  landed.gap > 300,
+  `landed on the match, not at the bottom (${landed.gap}px of chat below it)`,
+)
+assertTrue(landed.jump, "jump-to-latest offered while scrolled up")
+assertTrue(landed.search === "", "deep-link params cleaned out of the URL")
+await page.screenshot({ path: "shots/e2e-find-landed.png" })
+await page.locator("[data-ui='jump-latest']").click()
+await page.waitForTimeout(1000)
+assertTrue(
+  await page.evaluate(() => {
+    const el = document.querySelector("[data-ui='app-main'] .overflow-y-auto")
+    return (
+      (el?.scrollHeight ?? 0) - (el?.scrollTop ?? 0) - (el?.clientHeight ?? 0) < 4
+    )
+  }),
+  "jump-to-latest returns to the newest message",
+)
+
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })
 await page.getByRole("button", { name: "Check for updates" }).click()
@@ -437,12 +518,6 @@ if (storedKey !== "sk-or-v1-e2e-paste") {
 
 // request shape checks
 const first = bodies[0]
-const assertTrue = (cond, msg) => {
-  if (!cond) {
-    console.error("ASSERT FAIL:", msg)
-    process.exitCode = 1
-  } else console.log("ok:", msg)
-}
 assertTrue(first.model === "anthropic/claude-sonnet-4.5", "model id sent")
 assertTrue(first.stream === true, "stream requested")
 assertTrue(first.usage?.include === true, "usage accounting requested")

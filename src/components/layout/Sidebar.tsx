@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAllChats } from "@/hooks/use-chat-data"
 import { useIsDark } from "@/hooks/use-theme"
-import { deleteChat, db, searchMessages } from "@/lib/db"
+import { deleteChat, db, searchMessages, type SearchHit } from "@/lib/db"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Chat } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -48,16 +48,25 @@ function groupLabel(ts: number): string {
 function ChatRow({
   chat,
   active,
-  snippet,
+  hit,
+  query,
   onNavigate,
 }: {
   chat: Chat
   active: boolean
-  snippet?: string
+  /** the message this chat matched on, when the row came from a search */
+  hit?: SearchHit
+  query: string
   onNavigate: (path: string) => void
 }) {
   const syncUrl = useSettings((s) => s.syncUrl)
-  const path = chat.kind === "image" ? `/images/${chat.id}` : `/chat/${chat.id}`
+  const base = chat.kind === "image" ? `/images/${chat.id}` : `/chat/${chat.id}`
+  /* opening a search result should land on the matching message, with the
+     find bar primed to step through the rest of them */
+  const path =
+    hit && chat.kind === "chat"
+      ? `${base}?m=${encodeURIComponent(hit.messageId)}&q=${encodeURIComponent(query)}`
+      : base
 
   const rename = async () => {
     const title = await promptDialog({
@@ -113,9 +122,9 @@ function ChatRow({
           )}
           <span className="truncate text-[13.5px]">{chat.title}</span>
         </span>
-        {snippet && (
+        {hit && (
           <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
-            {snippet}
+            {hit.snippet}
           </span>
         )}
       </button>
@@ -180,7 +189,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   // full-text search over message content (debounced)
-  const [contentHits, setContentHits] = useState<Map<string, string> | null>(null)
+  const [contentHits, setContentHits] = useState<Map<string, SearchHit> | null>(
+    null,
+  )
   useEffect(() => {
     const q = query.trim()
     if (q.length < 2) {
@@ -294,7 +305,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   key={c.id}
                   chat={c}
                   active={location.pathname.includes(c.id)}
-                  snippet={contentHits?.get(c.id)}
+                  hit={contentHits?.get(c.id)}
+                  query={query.trim()}
                   onNavigate={go}
                 />
               ))}

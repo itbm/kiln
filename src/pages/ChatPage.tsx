@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
+  ArrowDownIcon,
   ChartColumnIcon,
   CloudUploadIcon,
   DownloadIcon,
@@ -9,6 +10,7 @@ import {
   MoreVerticalIcon,
   PencilIcon,
   ScissorsIcon,
+  SearchIcon,
   SparklesIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -16,6 +18,7 @@ import { toast } from "sonner"
 import { AppShell } from "@/components/layout/AppShell"
 import { ChatHeader } from "@/components/layout/ChatHeader"
 import { Composer } from "@/components/chat/Composer"
+import { FindBar } from "@/components/chat/FindBar"
 import { MessageView } from "@/components/chat/MessageView"
 import { ArtifactViewer } from "@/components/chat/ArtifactView"
 import { QuestionsSheet } from "@/components/chat/QuestionsSheet"
@@ -46,6 +49,7 @@ import {
   type QAnswer,
   type QuestionsBlock,
 } from "@/lib/questions"
+import { revealMessage } from "@/lib/find"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
 import { uid } from "@/lib/utils"
@@ -122,6 +126,7 @@ function Welcome() {
 export default function ChatPage() {
   const { chatId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const chat = useChat(chatId)
   const messages = useChatMessages(chatId)
 
@@ -140,6 +145,8 @@ export default function ChatPage() {
   const [pendingSkills, setPendingSkills] = useState<string[]>(defaultSkillIds)
   const [artifact, setArtifact] = useState<ArtifactBlock | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [find, setFind] = useState<{ query: string } | null>(null)
+  const [atBottom, setAtBottom] = useState(true)
   const [questionsFor, setQuestionsFor] = useState<{
     msg: Message
     block: QuestionsBlock
@@ -157,6 +164,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     // reset composer state when switching chats
+    setFind(null)
+    setAtBottom(true)
     if (chat) {
       setModelRef(
         chat.model && chat.provider
@@ -196,8 +205,52 @@ export default function ChatPage() {
   const onScroll = () => {
     const el = scrollRef.current
     if (!el) return
-    nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight
+    nearBottom.current = gap < 120
+    // wider band for the button so it doesn't blink in and out while reading
+    const near = gap < 240
+    setAtBottom((v) => (v === near ? v : near))
   }
+
+  const jumpToLatest = () => {
+    const el = scrollRef.current
+    if (!el) return
+    nearBottom.current = true
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }
+
+  /* Arriving from a sidebar search result: land on the message that matched
+     (?m=), with the find bar primed to step through the rest (?q=). */
+  const jumpMsg = searchParams.get("m")
+  const jumpQuery = searchParams.get("q")
+  useEffect(() => {
+    if (!jumpMsg || !messages.length) return
+    const frame = requestAnimationFrame(() => {
+      const el = scrollRef.current
+      if (!el) return
+      if (revealMessage(el, jumpMsg)) {
+        nearBottom.current = false
+        setAtBottom(false)
+        if (jumpQuery) setFind({ query: jumpQuery })
+      }
+      // spent either way: a stale link must not re-fire on the next message
+      setSearchParams({}, { replace: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [jumpMsg, jumpQuery, messages.length, setSearchParams])
+
+  // desktop: ⌘/Ctrl+F finds inside the conversation, not the whole document
+  useEffect(() => {
+    if (!chatId) return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault()
+        setFind((f) => f ?? { query: "" })
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [chatId])
 
   // Auto-open the questions sheet when a reply that ends in a <questions>
   // block finishes streaming (not when merely browsing an old chat).
@@ -316,6 +369,9 @@ export default function ChatPage() {
       case "compact":
         void runCompact(arg)
         break
+      case "find":
+        setFind({ query: arg ?? "" })
+        break
       case "clear":
         void clearContext(chat).then(() =>
           toast.success("Context cleared — messages stay visible, but aren't resent"),
@@ -428,6 +484,9 @@ export default function ChatPage() {
                     <DropdownMenuItem onClick={() => void renameChat()}>
                       <PencilIcon /> Rename
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFind({ query: "" })}>
+                      <SearchIcon /> Find in chat
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setStatsOpen(true)}>
                       <ChartColumnIcon /> Usage & cost
                     </DropdownMenuItem>
@@ -538,7 +597,25 @@ export default function ChatPage() {
           )}
 
           {(hasKeys || !!chatId) && (
-          <div className="mx-auto w-full max-w-3xl">
+          <div className="relative mx-auto w-full max-w-3xl">
+            {!atBottom && messages.length > 0 && (
+              <button
+                onClick={jumpToLatest}
+                aria-label="Jump to latest"
+                data-ui="jump-latest"
+                className="absolute -top-11 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-card/95 p-2 text-muted-foreground shadow-md backdrop-blur active:scale-95"
+              >
+                <ArrowDownIcon className="size-4" />
+              </button>
+            )}
+            {find && (
+              <FindBar
+                scroller={scrollRef}
+                revision={messages.length + liveLen}
+                initialQuery={find.query}
+                onClose={() => setFind(null)}
+              />
+            )}
             {ctxUsage !== null && ctxUsage >= 0.6 && !generating && (
               <div className="flex justify-end px-4 pb-1">
                 <button
