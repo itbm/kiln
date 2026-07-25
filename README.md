@@ -68,6 +68,12 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   (later messages are replaced after a confirm); regenerating a reply keeps
   every attempt with a Claude-style ‹ 1/2 › version switcher, including
   when you switch model between attempts.
+- **Drafts that survive** — an unsent message (with its attachments) stays
+  with the chat you were writing it in: leave for another chat and come back,
+  reload, or let iOS discard the app in the background, and the words are
+  still there. The chat list flags which conversations are holding one.
+  Drafts in temporary chats live in memory only, like everything else in
+  ghost mode.
 - **Artefacts** — the assistant can emit Markdown documents, self-contained
   HTML pages, code files and SVGs as tappable cards with a full-screen
   viewer: rendered preview (sandboxed iframe for HTML/SVG), source view,

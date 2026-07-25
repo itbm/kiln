@@ -36,6 +36,7 @@ import type { ArtifactBlock } from "@/lib/artifacts"
 import { commandHelpText } from "@/lib/commands"
 import { clearContext, compactChat, estimateWireTokens } from "@/lib/compact"
 import { db, deleteChat } from "@/lib/db"
+import { clearDraft, NEW_CHAT_DRAFT } from "@/lib/drafts"
 import {
   editUserMessage,
   persistMessage,
@@ -427,6 +428,7 @@ export default function ChatPage() {
       destructive: true,
     })
     if (!ok) return
+    clearDraft(chat.id)
     if (chat.temporary) useTemp.getState().remove(chat.id)
     else await deleteChat(chat.id)
     navigate("/")
@@ -637,6 +639,8 @@ export default function ChatPage() {
               onSend={(t, a) => void send(t, a)}
               onStop={() => chatId && useStream.getState().stop(chatId)}
               onCommand={handleCommand}
+              draftKey={chatId ?? NEW_CHAT_DRAFT}
+              draftEphemeral={chat?.temporary ?? pendingTemp}
               isNewChat={!chat}
               temporary={pendingTemp}
               onToggleTemporary={() => setPendingTemp((v) => !v)}

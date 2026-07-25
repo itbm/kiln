@@ -151,6 +151,18 @@ export interface Generation {
   usage?: Usage
 }
 
+/**
+ * An unsent composer message. Keyed by chat id (or one of the NEW_*_DRAFT
+ * keys before the chat exists), so a half-written message survives leaving
+ * the chat, a reload, or iOS discarding the PWA in the background.
+ */
+export interface Draft {
+  id: string
+  text: string
+  attachments?: Attachment[]
+  updatedAt: number
+}
+
 export interface Skill {
   id: string
   name: string

@@ -855,8 +855,9 @@ export default function SettingsPage() {
                 }).then((ok) => {
                   if (!ok) return
                   void db
-                    .transaction("rw", db.chats, db.messages, async () => {
+                    .transaction("rw", db.chats, db.messages, db.drafts, async () => {
                       await db.messages.clear()
+                      await db.drafts.clear()
                       await db.chats.clear()
                     })
                     .then(() => toast.success("All chats deleted"))

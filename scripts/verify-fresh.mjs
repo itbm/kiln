@@ -139,6 +139,113 @@ const dumpState = (page) =>
   await ctx.close()
 }
 
+// ---------- phase 3: an existing install upgrades without losing chats ----------
+// The Dexie schema gained a `drafts` store (db v2 → IDB version 20). Every
+// existing install is on the v1 schema (IDB version 10), so this seeds a
+// database exactly as Dexie left it there and checks the upgrade is additive.
+{
+  const { ctx, page } = await newPage(true)
+  await page.addInitScript(() => {
+    const open = indexedDB.open("amber", 10) // Dexie multiplies its version by 10
+    open.onupgradeneeded = () => {
+      const idb = open.result
+      const chats = idb.createObjectStore("chats", { keyPath: "id" })
+      chats.createIndex("updatedAt", "updatedAt")
+      chats.createIndex("kind", "kind")
+      const messages = idb.createObjectStore("messages", { keyPath: "id" })
+      messages.createIndex("chatId", "chatId")
+      messages.createIndex("createdAt", "createdAt")
+    }
+    window.__seeded = new Promise((res, rej) => {
+      open.onerror = () => rej(open.error)
+      open.onsuccess = () => {
+        const idb = open.result
+        const tx = idb.transaction(["chats", "messages"], "readwrite")
+        tx.objectStore("chats").put({
+          id: "legacy-1",
+          kind: "chat",
+          title: "Chat from before the upgrade",
+          createdAt: 1_700_000_000_000,
+          updatedAt: 1_700_000_000_000,
+        })
+        tx.objectStore("messages").put({
+          id: "legacy-msg-1",
+          chatId: "legacy-1",
+          role: "user",
+          content: "Words written on the old schema",
+          status: "done",
+          createdAt: 1_700_000_000_000,
+        })
+        tx.oncomplete = () => {
+          idb.close()
+          res(true)
+        }
+        tx.onerror = () => rej(tx.error)
+      }
+    })
+  })
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
+  await page.waitForTimeout(1500)
+  // the pre-existing chat is still listed…
+  await page.getByLabel("Open menu").click()
+  const legacyVisible =
+    (await page.getByText("Chat from before the upgrade").count()) > 0
+  console.log("legacy chat survives the schema upgrade:", legacyVisible)
+  await page.keyboard.press("Escape")
+  await page.waitForTimeout(400)
+  // …and the message with it, alongside the new drafts store
+  const after = await page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res, rej) => {
+      req.onsuccess = () => res(req.result)
+      req.onerror = () => rej(req.error)
+    })
+    const count = (store) =>
+      new Promise((res) => {
+        try {
+          const r = idb.transaction(store, "readonly").objectStore(store).count()
+          r.onsuccess = () => res(r.result)
+          r.onerror = () => res("err")
+        } catch {
+          res("missing")
+        }
+      })
+    return {
+      version: idb.version,
+      stores: [...idb.objectStoreNames],
+      chats: await count("chats"),
+      messages: await count("messages"),
+      drafts: await count("drafts"),
+    }
+  })
+  console.log("PHASE 3 after upgrade:", JSON.stringify(after))
+  // typing still lands on disk on the upgraded database
+  await page.getByPlaceholder("Message Kiln…").fill("draft on an upgraded db")
+  await page.waitForTimeout(1600)
+  const drafted = await page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    const all = await new Promise((res) => {
+      const r = idb.transaction("drafts", "readonly").objectStore("drafts").getAll()
+      r.onsuccess = () => res(r.result)
+    })
+    return all.map((d) => d.text)
+  })
+  console.log("draft written on the upgraded database:", JSON.stringify(drafted))
+  if (
+    !legacyVisible ||
+    after.chats !== 1 ||
+    after.messages !== 1 ||
+    after.version !== 20 ||
+    !after.stores.includes("drafts") ||
+    drafted[0] !== "draft on an upgraded db"
+  ) {
+    console.error("ASSERT FAIL: v1 → v2 schema upgrade did not preserve data")
+    process.exitCode = 1
+  }
+  await ctx.close()
+}
+
 await api.dispose()
 await browser.close()
-console.log("VERIFY DONE")
+console.log(process.exitCode ? "VERIFY FAILED" : "VERIFY DONE")

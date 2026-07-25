@@ -9,6 +9,7 @@ import {
   MoonIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PencilLineIcon,
   SearchIcon,
   SettingsIcon,
   SquarePenIcon,
@@ -25,8 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAllChats } from "@/hooks/use-chat-data"
+import { useDraftPreviews } from "@/hooks/use-drafts"
 import { useIsDark } from "@/hooks/use-theme"
 import { deleteChat, db, searchMessages, type SearchHit } from "@/lib/db"
+import { clearDraft } from "@/lib/drafts"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
 import type { Chat } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -49,6 +52,7 @@ function ChatRow({
   chat,
   active,
   hit,
+  draft,
   query,
   onNavigate,
 }: {
@@ -56,6 +60,8 @@ function ChatRow({
   active: boolean
   /** the message this chat matched on, when the row came from a search */
   hit?: SearchHit
+  /** preview of an unsent message waiting in this chat's composer */
+  draft?: string
   query: string
   onNavigate: (path: string) => void
 }) {
@@ -88,6 +94,7 @@ function ChatRow({
       destructive: true,
     })
     if (!ok) return
+    clearDraft(chat.id)
     if (chat.temporary) useTemp.getState().remove(chat.id)
     else await deleteChat(chat.id)
     if (active) onNavigate(chat.kind === "image" ? "/images" : "/")
@@ -121,11 +128,23 @@ function ChatRow({
             <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
           )}
           <span className="truncate text-[13.5px]">{chat.title}</span>
+          {draft && !hit && (
+            <PencilLineIcon
+              className="ml-auto size-3 shrink-0 text-primary"
+              aria-label="Unsent draft"
+            />
+          )}
         </span>
-        {hit && (
+        {hit ? (
           <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
             {hit.snippet}
           </span>
+        ) : (
+          draft && (
+            <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
+              <span className="text-primary">Draft</span> · {draft}
+            </span>
+          )
         )}
       </button>
       <DropdownMenu>
@@ -176,6 +195,7 @@ function ChatRow({
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const chats = useAllChats()
+  const drafts = useDraftPreviews()
   const [query, setQuery] = useState("")
   const navigate = useNavigate()
   const location = useLocation()
@@ -306,6 +326,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   chat={c}
                   active={location.pathname.includes(c.id)}
                   hit={contentHits?.get(c.id)}
+                  draft={drafts.get(c.id)}
                   query={query.trim()}
                   onNavigate={go}
                 />

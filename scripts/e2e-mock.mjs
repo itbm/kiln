@@ -492,6 +492,102 @@ assertTrue(
   "jump-to-latest returns to the newest message",
 )
 
+// --- drafts: an unsent message survives leaving the chat and a reload ---
+// A long prompt typed on a phone is precious work; switching chats or iOS
+// discarding the PWA in the background must not eat it.
+const chatUrl = page.url()
+const draftText = "Half-written thought about burr grinder alignment"
+const composer = page.getByPlaceholder("Message Kiln…")
+await composer.fill(draftText)
+await page.locator('input[type="file"]').setInputFiles({
+  name: "notes.txt",
+  mimeType: "text/plain",
+  buffer: Buffer.from("fresh roast dates matter"),
+})
+await page.getByText("notes.txt").waitFor({ timeout: 5000 })
+await page.waitForTimeout(1500) // idle debounce writes it to IndexedDB
+
+// leaving for the new-chat screen must not carry the words across
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await composer.inputValue()) === "",
+  "the previous chat's draft doesn't leak into a new chat",
+)
+
+// cold reload straight back into the chat: text and attachment both return
+await page.goto(chatUrl, { waitUntil: "networkidle" })
+await composer.waitFor({ timeout: 10000 })
+await page.waitForTimeout(600)
+assertTrue(
+  (await composer.inputValue()) === draftText,
+  "draft restored after a cold reload of the chat",
+)
+await page.getByText("notes.txt").waitFor({ timeout: 5000 })
+console.log("ok: the draft's attachment came back with it")
+await page.screenshot({ path: "shots/e2e-draft-restored.png" })
+
+// the chat list says which chats are still holding unsent words
+await page.getByLabel("Open menu").click()
+await drawer
+  .getByText(/Draft · Half-written thought/)
+  .first()
+  .waitFor({ timeout: 5000 })
+console.log("ok: the chat list flags the unsent draft")
+
+// a second conversation, to prove drafts belong to one chat each
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await composer.fill("Tell me about grinders")
+await page.getByLabel("Send").click()
+await page.getByText("Want tasting notes for any of these?").last().waitFor({ timeout: 20000 })
+await page.waitForTimeout(2500) // let the title call land before renaming
+await composer.fill("/title Grinder talk")
+await page.getByLabel("Send").click()
+await page.getByRole("heading", { name: "Grinder talk" }).waitFor({ timeout: 5000 })
+const draftB = "notes meant only for the second chat"
+await composer.fill(draftB)
+await page.waitForTimeout(1500)
+
+// switching between two open chats: each gets its own words back
+await page.getByLabel("Open menu").click()
+await drawer.getByText("Espresso bean picks").first().click()
+await page.waitForTimeout(800)
+assertTrue(
+  (await composer.inputValue()) === draftText,
+  "switching chats restores that chat's draft, not the one you left",
+)
+await page.getByText("notes.txt").waitFor({ timeout: 5000 })
+await page.getByLabel("Open menu").click()
+await drawer.getByText("Grinder talk").first().click()
+await page.waitForTimeout(800)
+assertTrue(
+  (await composer.inputValue()) === draftB,
+  "and back again — the second chat's draft is intact",
+)
+assertTrue(
+  (await page.getByText("notes.txt").count()) === 0,
+  "attachments stay with their own chat's draft",
+)
+
+// sending clears that chat's draft, and only that one
+await page.getByLabel("Send").click()
+await page.waitForTimeout(1500)
+assertTrue((await composer.inputValue()) === "", "sending empties the composer")
+await page.getByLabel("Open menu").click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await drawer.getByText(/Draft · notes meant only/).count()) === 0,
+  "sending clears the stored draft",
+)
+assertTrue(
+  (await drawer.getByText(/Draft · Half-written thought/).count()) === 1,
+  "the other chat's draft is still waiting",
+)
+await page.keyboard.press("Escape")
+await page.waitForTimeout(600)
+
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })
 await page.getByRole("button", { name: "Check for updates" }).click()
