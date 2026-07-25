@@ -155,3 +155,7 @@ Anchors are plain DOM attributes, so any surface can invite him:
 through their existing `data-slot` attributes. `anchors.ts` re-queries
 the DOM on demand, so anything that renders one of these attributes is
 automatically on his map.
+
+`data-pip-spot="ledge"` is the one override: anything docked above the
+composer (today the find bar) claims the bottom ledge while it is up, so
+he strolls along its top edge instead of standing over its controls.

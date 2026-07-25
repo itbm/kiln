@@ -42,15 +42,22 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
 
 - **Chat & history** — streaming markdown chat with code highlighting, tables,
   chat list grouped by day, rename, delete, export/import (JSON), and
-  **full-text search** across every message (with snippets).
+  **full-text search** across every message (with snippets). Opening a hit
+  **lands on the message that matched** — it scrolls into the middle of the
+  view and flashes — instead of dumping you at the bottom of a long chat.
+- **Find in chat** — `/find`, the chat menu, or ⌘/Ctrl+F opens a find bar
+  above the composer: every occurrence is highlighted where it sits, ‹ ›
+  steps through them and the counter says how many there are. Installed to
+  the Home Screen there's no browser find-in-page, so this is it. A
+  jump-to-latest button appears whenever you've scrolled back up.
 - **Context management** — a chars-based token estimate of every request;
   when a chat nears the model's context limit it is **auto-compacted**
   (older messages summarised by your utility model, newer ones kept
   verbatim). Messages stay visible — a divider marks what's summarised.
   A meter pill appears at 60% usage for one-tap compaction.
 - **Slash commands** — type `/` in the composer: `/compact [focus]`,
-  `/clear` (fresh context, messages kept), `/title`, `/model`, `/effort`,
-  `/export`, `/stats`, `/help`.
+  `/clear` (fresh context, messages kept), `/find [text]`, `/title`,
+  `/model`, `/effort`, `/export`, `/stats`, `/help`.
 - **Usage & cost** — every reply records what the provider actually
   reported, never an estimate: tokens in/out (with cached and reasoning
   splits), the exact credits charged on OpenRouter, and generation speed

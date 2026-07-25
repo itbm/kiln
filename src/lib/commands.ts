@@ -22,6 +22,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     needsChat: true,
   },
   {
+    name: "find",
+    args: "[text]",
+    description: "Find text in this conversation",
+    needsChat: true,
+  },
+  {
     name: "title",
     args: "[text]",
     description: "Rename the chat, or regenerate the title",

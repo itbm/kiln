@@ -291,6 +291,37 @@
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
+/* ---------- find in chat ---------- */
+/* Painted via the CSS Custom Highlight API (see lib/find.ts): ranges only,
+   so the markdown output is never touched. */
+::highlight(kiln-find) {
+  background-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  color: inherit;
+}
+::highlight(kiln-find-current) {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+@keyframes find-flash {
+  0%,
+  55% {
+    background-color: color-mix(in srgb, var(--primary) 16%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+/* the message a search result landed on, so the eye finds it at once */
+.find-flash {
+  animation: find-flash 1.9s ease-out;
+  border-radius: var(--radius);
+}
+@media (prefers-reduced-motion: reduce) {
+  .find-flash {
+    animation-duration: 2.4s;
+  }
+}
+
 @keyframes shimmer-text {
   0% {
     background-position: 200% 0;

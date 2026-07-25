@@ -94,7 +94,10 @@ function UserMessage({
   const [draft, setDraft] = useState(msg.content)
 
   return (
-    <div className="group flex flex-col items-end gap-1.5 px-4">
+    <div
+      data-msg-id={msg.id}
+      className="group flex flex-col items-end gap-1.5 px-4"
+    >
       {msg.attachments?.map((a) =>
         a.kind === "image" && a.dataUrl ? (
           <img
@@ -151,7 +154,10 @@ function UserMessage({
               {msg.content}
             </div>
           )}
-          <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 max-md:opacity-60">
+          <div
+            data-find-skip
+            className="flex items-center gap-0.5 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 max-md:opacity-60"
+          >
             {msg.editedAt && <span className="mr-1">edited</span>}
             <CopyIconButton text={msg.content} />
             {onEdit && !busy && (
@@ -212,7 +218,7 @@ export const MessageView = memo(function MessageView({
   const vIndex = activeVersionIndex(msg)
 
   return (
-    <div className="group px-4">
+    <div data-msg-id={msg.id} className="group px-4">
       {reasoning && (
         <ReasoningBlock
           reasoning={reasoning}
@@ -297,7 +303,10 @@ export const MessageView = memo(function MessageView({
       )}
 
       {!streaming && (
-        <div className="mt-1.5 flex items-center gap-1 text-[11.5px] text-muted-foreground">
+        <div
+          data-find-skip
+          className="mt-1.5 flex items-center gap-1 text-[11.5px] text-muted-foreground"
+        >
           {nVersions > 1 && onSwitchVersion && (
             <span className="mr-1 flex items-center">
               <Button

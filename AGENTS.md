@@ -85,6 +85,11 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
 - `src/lib/compact.ts`, `commands.ts`, `versions.ts`, `artifacts.ts`,
   `questions.ts` — context compaction, slash commands, response versions,
   artifact parsing, interactive `<questions>` blocks.
+- `src/lib/find.ts` — find in chat. Hits are painted with the CSS Custom
+  Highlight API (ranges only, never DOM mutation, so the markdown renderer
+  is untouched); chrome that shouldn't match carries `data-find-skip`, and
+  messages carry `data-msg-id` so a sidebar search result can scroll to the
+  message it matched (`/chat/:id?m=…&q=…`).
 - `src/lib/usage.ts` — provider-reported token/cost accounting: per-reply
   `Message.usage` (captured by the engine from stream `done` events, one
   per tool round), formatting, and per-chat totals. Usage is only ever
