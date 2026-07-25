@@ -26,11 +26,12 @@ const SIGN_AT = 22 /* seconds of painting before he signs the thing */
 
 /**
  * Painter Pip: while an image generates on the Images page he stands on the
- * top edge of the "Painting…" tile — beret on, palette in his off hand —
- * and works the canvas. He dips, dabs, lays a long stroke, and now and then
- * leans back with the brush at arm's length to measure the composition like
- * every painter in every cartoon. The moment the picture lands (the tile's
- * data-art-painting flag clears) he darts back to the composer ledge.
+ * top edge of the "Painting…" tile — palette in his off hand, brush in the
+ * other — and works the canvas. He dips, dabs, lays a long stroke, and now
+ * and then leans back with the brush at arm's length to measure the
+ * composition like every painter in every cartoon. The moment the picture
+ * lands (the tile's data-art-painting flag clears) he darts back to the
+ * composer ledge.
  *
  * This mirrors the builder (actions/build.ts): the engine's site check sends
  * him up, DartAction hands over on landing, and the same overlay/out-of-band
@@ -312,44 +313,6 @@ export class PaintAction implements PipAction {
     c.stroke()
   }
 
-  /** the beret: a soft disc worn at an angle, with the little stalk on top */
-  private drawBeret(c: CanvasRenderingContext2D) {
-    c.save()
-    c.translate(-0.06, -0.78)
-    c.rotate(-0.24)
-    c.lineJoin = "round"
-    c.beginPath()
-    c.moveTo(-0.46, 0.06)
-    c.bezierCurveTo(-0.56, -0.3, -0.24, -0.46, 0.06, -0.42)
-    c.bezierCurveTo(0.42, -0.38, 0.56, -0.16, 0.44, 0.04)
-    c.bezierCurveTo(0.2, 0.16, -0.22, 0.17, -0.46, 0.06)
-    c.closePath()
-    c.fillStyle = "#46456B"
-    c.fill()
-    c.lineWidth = 0.05
-    c.strokeStyle = "#28284A"
-    c.stroke()
-    /* the headband edge */
-    c.beginPath()
-    c.ellipse(-0.02, 0.07, 0.4, 0.08, 0.04, 0, 6.2832)
-    c.fillStyle = "#37365A"
-    c.fill()
-    c.lineWidth = 0.04
-    c.stroke()
-    /* stalk */
-    c.beginPath()
-    c.arc(0.04, -0.44, 0.055, 0, 6.2832)
-    c.fillStyle = "#37365A"
-    c.fill()
-    c.stroke()
-    /* a little sheen */
-    c.beginPath()
-    c.ellipse(-0.16, -0.24, 0.13, 0.06, -0.4, 0, 6.2832)
-    c.fillStyle = "rgba(255,255,255,.22)"
-    c.fill()
-    c.restore()
-  }
-
   /** the palette: wooden oval, thumb hole, five dabs of colour */
   private drawPalette(c: CanvasRenderingContext2D) {
     const e = this.e
@@ -460,7 +423,6 @@ export class PaintAction implements PipAction {
     c.translate(pose.x, pose.y)
     c.rotate(pose.tilt)
     c.scale(pose.S * pose.sx * pose.face, pose.S * pose.sy)
-    this.drawBeret(c)
     const g = pose.grip ?? this.brushGrip()
     const gb = pose.gripB ?? this.paletteGrip()
     /* palette first, then the arm that holds it, then the hand on top */

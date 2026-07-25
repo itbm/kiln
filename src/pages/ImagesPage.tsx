@@ -24,7 +24,7 @@ import { ImageLightbox } from "@/components/chat/ImageLightbox"
 function PaintingTile() {
   return (
     /* data-art-painting is Pip's easel: while it's on screen he stands on
-       the tile's top edge in a beret and paints (see src/pip/actions/paint.ts) */
+       the tile's top edge and paints (see src/pip/actions/paint.ts) */
     <div
       data-art-painting="true"
       className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40"

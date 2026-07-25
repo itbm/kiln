@@ -57,10 +57,10 @@ He returns to the ledge the moment the card completes.
 
 On the **Images** page the same trick runs in a smock: while a picture
 generates, the "Painting…" tile carries `data-art-painting` and he darts
-up onto its top edge in a **beret**, palette in his off hand
-(`actions/paint.ts`) — dipping for a fresh colour, dabbing, laying a long
-stroke, and now and then leaning back to size up the composition down the
-handle of his brush. Past **22 s** the job has earned a **signature**: he
+up onto its top edge with a **palette** in his off hand and a brush in
+the other (`actions/paint.ts`) — dipping for a fresh colour, dabbing,
+laying a long stroke, and now and then leaning back to size up the
+composition down the handle of his brush. Past **22 s** the job has earned a **signature**: he
 scoots to the corner and flourishes one onto the canvas, which then dries
 away on its own. He drops everything and goes home the moment the picture
 lands.

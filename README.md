@@ -128,8 +128,8 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   While an artefact streams in he dons a hard hat and plays builder on
   its card, cycling hammer, saw and drill as the job drags on — and past
   30 seconds he jetpacks the card up to the top of the screen and
-  parachutes it back down. The same energy goes elsewhere: a beret and
-  palette while an image is generating (he signs the canvas if it takes
+  parachutes it back down. The same energy goes elsewhere: palette and
+  brush while an image is generating (he signs the canvas if it takes
   long enough), a broom and clouds of dust while a chat is being
   compacted, and a dizzy spell or a dead faint when a reply errors out
   (toggle him off in Settings; he respects reduced motion). Themes and
