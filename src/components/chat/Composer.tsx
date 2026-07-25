@@ -30,6 +30,7 @@ import {
   clearDraft,
   loadDraft,
   makeDraftEphemeral,
+  persistDraft,
   saveDraft,
 } from "@/lib/drafts"
 import { coerceEffort, effortChoices, effortLabel } from "@/lib/effort"
@@ -124,9 +125,11 @@ export function Composer(props: ComposerProps) {
     }
   }, [props.draftKey])
 
-  /* Turning on temporary chat retroactively covers what's already typed. */
+  /* Turning temporary chat on retroactively covers what's already typed;
+     turning it off again puts it back where a reload will find it. */
   useEffect(() => {
     if (props.draftEphemeral) makeDraftEphemeral(props.draftKey)
+    else void persistDraft(props.draftKey)
   }, [props.draftEphemeral, props.draftKey])
 
   const modelInfo = findModel(props.modelRef)

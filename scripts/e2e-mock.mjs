@@ -544,6 +544,39 @@ assertTrue(
   "the previous chat's draft doesn't leak into a new chat",
 )
 
+// ghost mode means ghost mode: a draft typed into a temporary chat is held
+// in memory and never written to disk — until you turn temporary back off
+const storedDrafts = () =>
+  page.evaluate(async () => {
+    const req = indexedDB.open("amber")
+    const idb = await new Promise((res) => (req.onsuccess = () => res(req.result)))
+    return new Promise((res) => {
+      const r = idb.transaction("drafts", "readonly").objectStore("drafts").getAll()
+      r.onsuccess = () => res(r.result.map((d) => d.text))
+    })
+  })
+await page.getByLabel("More options").click()
+await page.getByText("Temporary chat").click()
+await composer.fill("words typed in ghost mode")
+await page.waitForTimeout(1600)
+assertTrue(
+  !(await storedDrafts()).includes("words typed in ghost mode"),
+  "a draft typed in a temporary chat never reaches the disk",
+)
+await page.getByLabel("More options").click()
+await page.getByText("Disable temporary chat").click()
+await page.waitForTimeout(600)
+assertTrue(
+  (await storedDrafts()).includes("words typed in ghost mode"),
+  "leaving ghost mode puts the draft somewhere a reload will find it",
+)
+await composer.fill("")
+await page.waitForTimeout(600)
+assertTrue(
+  !(await storedDrafts()).includes("words typed in ghost mode"),
+  "emptying the box drops the stored draft",
+)
+
 // cold reload straight back into the chat: text and attachment both return
 await page.goto(chatUrl, { waitUntil: "networkidle" })
 await composer.waitFor({ timeout: 10000 })
