@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react"
 import {
   ArrowUpIcon,
   ChevronDownIcon,
+  CloudIcon,
   GaugeIcon,
   GhostIcon,
   ImageIcon,
   PaperclipIcon,
   PlusIcon,
+  SmartphoneIcon,
   SparklesIcon,
   SquareIcon,
   XIcon,
@@ -34,7 +36,7 @@ import {
   saveDraft,
 } from "@/lib/drafts"
 import { coerceEffort, effortChoices, effortLabel } from "@/lib/effort"
-import type { Attachment, Effort, ModelRef } from "@/lib/types"
+import type { Attachment, ChatRuntime, Effort, ModelRef } from "@/lib/types"
 import {
   cn,
   downscaleImage,
@@ -44,6 +46,7 @@ import {
   uid,
 } from "@/lib/utils"
 import { displayModelName, findModel } from "@/stores/models"
+import { useCloud } from "@/stores/cloud"
 import { isTouchDevice } from "@/hooks/use-media"
 
 export interface ComposerProps {
@@ -54,6 +57,10 @@ export interface ComposerProps {
   effort: Effort
   onModelChange: (ref: ModelRef) => void
   onEffortChange: (e: Effort) => void
+  /** where turns run; the pill only shows when the server has the runner */
+  runtime?: ChatRuntime
+  /** absent (e.g. temporary chats) hides the Local/Cloud pill entirely */
+  onRuntimeChange?: (r: ChatRuntime) => void
   onSend: (text: string, attachments: Attachment[]) => void
   onStop: () => void
   /** handles non-local slash commands (compact, clear, title, export, help) */
@@ -76,6 +83,7 @@ export function Composer(props: ComposerProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [skillsOpen, setSkillsOpen] = useState(false)
+  const cloudAvailable = useCloud((s) => s.available)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   /* Live mirror of what's in the box. The draft store is written from event
@@ -452,6 +460,66 @@ export function Composer(props: ComposerProps) {
             </DropdownMenu>
           )}
 
+          {cloudAvailable && !props.imageMode && props.onRuntimeChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  data-ui="composer-pill"
+                  aria-label="Where replies generate"
+                  className={cn(
+                    "flex items-center gap-1 rounded-full px-2 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-accent",
+                    props.runtime === "cloud"
+                      ? "text-primary"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {props.runtime === "cloud" ? (
+                    <CloudIcon className="size-3.5" />
+                  ) : (
+                    <SmartphoneIcon className="size-3.5" />
+                  )}
+                  <span>{props.runtime === "cloud" ? "Cloud" : "Local"}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="max-w-72">
+                <DropdownMenuItem
+                  onClick={() => props.onRuntimeChange!("local")}
+                  className={cn(
+                    "items-start",
+                    props.runtime !== "cloud" && "bg-accent",
+                  )}
+                >
+                  <SmartphoneIcon className="mt-0.5" />
+                  <div className="min-w-0">
+                    <div>Local</div>
+                    <div className="text-[11.5px] leading-snug text-muted-foreground">
+                      Replies stream on this device. Closing the app can
+                      interrupt them.
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => props.onRuntimeChange!("cloud")}
+                  className={cn(
+                    "items-start",
+                    props.runtime === "cloud" && "bg-accent",
+                  )}
+                >
+                  <CloudIcon className="mt-0.5" />
+                  <div className="min-w-0">
+                    <div>Cloud</div>
+                    <div className="text-[11.5px] leading-snug text-muted-foreground">
+                      Your server runs the reply, so closing the app doesn't
+                      stop it — Kiln catches up and saves it here. The
+                      conversation and your API key sit in server memory
+                      while it works.
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {props.isNewChat && props.temporary && (
             <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11.5px] font-medium text-primary">
               <GhostIcon className="size-3" /> Temp
@@ -482,8 +550,13 @@ export function Composer(props: ComposerProps) {
           )}
         </div>
       </div>
-      {/* Ember theme only (display gated in CSS) */}
-      <div data-ui="composer-hint">every byte stays on this phone</div>
+      {/* Ember theme only (display gated in CSS); the promise must stay
+          honest when turns are handed to the server */}
+      <div data-ui="composer-hint">
+        {props.runtime === "cloud"
+          ? "cloud replies run on your server, then land back on this phone"
+          : "every byte stays on this phone"}
+      </div>
 
       <ModelPicker
         open={pickerOpen}

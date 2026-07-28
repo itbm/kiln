@@ -3,9 +3,11 @@
 Kiln is a mobile-first AI chat app you install from your own server as a PWA
 — no App Store required. It talks **directly from your phone to the model
 providers** (OpenRouter, Ollama cloud) with your own API keys, and stores
-**everything on the device** (IndexedDB). The server's only jobs are to hand
-out the static files and to relay Ollama traffic; your chats and keys never
-touch it.
+**everything on the device** (IndexedDB). The server's jobs are to hand out
+the static files and to relay Ollama traffic; your chats and keys never
+touch it — unless you flip a chat to **Cloud**, which hands that reply to
+the server's memory-only turn runner so closing the app doesn't lose it.
+Finished replies always land back on the device.
 
 Built with React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Dexie and Workbox.
 
@@ -178,6 +180,18 @@ demo data — regenerate any time with `npm run shots -- docs/screenshots`.
   arrives; if the OS kills the tab mid-answer you keep everything received
   so far, marked "interrupted", with a one-tap **Continue generating**.
   An optional wake lock keeps the screen on during long generations.
+- **Local or Cloud replies** — a composer pill (next to the effort menu)
+  chooses where each chat's replies run. **Local** is the default: the
+  phone streams from the provider directly. **Cloud** hands the turn to
+  your server's runner — provider streaming *and* tool calls happen there,
+  so you can close the app mid-reply; reopening catches up (live if it's
+  still generating, instantly if it finished) and stores the result on the
+  device like any other reply. Stop works from the phone either way. The
+  honest cost: while a cloud turn runs, the conversation and the API keys
+  it needs sit in the server's memory — never on its disk — and the
+  finished reply is deleted from the server the moment the phone collects
+  it (or after 24 h). The pill only appears when your deployment has the
+  runner; temporary chats never use it.
 - **Server hand-off (optional)** — "Send to server" POSTs a chat as JSON to
   a URL you configure, ready for a future sync backend.
 
@@ -238,6 +252,11 @@ The compose file runs Kiln as an immutable, minimal-privilege container:
   buffering to temp files is disabled in both directions — and it strips
   cookies both ways plus client-identifying headers, so the upstream sees
   only your API key, never a tracking cookie or the phone's address.
+- **The cloud turn runner is memory-only** — cloud-mode jobs (conversation,
+  keys, the reply being generated) live in the Node process's memory, which
+  the read-only filesystem couldn't persist anyway. Keys are dropped the
+  moment a turn finishes; the reply is dropped when the phone collects it,
+  or after 24 hours. It writes no logs of chat content.
 
 ### The Ollama proxy
 
@@ -258,13 +277,34 @@ redirects so the container's internal port (8080) never leaks into
 `Location` headers. You can
 also point the endpoint at a LAN Ollama instance
 (`http://192.168.x.x:11434`) if you export `OLLAMA_ORIGINS` there.
-OpenRouter and Tavily are called directly from the device.
+OpenRouter and Tavily are called directly from the device — in Local mode;
+in Cloud mode the runner calls them from the server for that turn.
+
+### The cloud turn runner
+
+The same container runs `server/cloud.mjs`, a dependency-free Node process
+on `127.0.0.1:8090`, reached through nginx at `/api/cloud/` (SSE streaming
+enabled, cookies stripped, same relative-path posture as the relay). When a
+chat is set to **Cloud**, the app POSTs the turn — messages, model, effort,
+tool definitions and the keys to run them — as a job; the runner executes
+the same provider/tool round loop the app runs locally and journals every
+event. The app replays the journal over SSE from the start, whether it
+never left or comes back an hour later, then tells the runner to forget
+the job. If the runner is down or absent (an older image), the app's
+health probe fails quietly and the Local/Cloud pill simply doesn't appear —
+chat itself never depends on the runner.
+
+Like the rest of Kiln there's no account system: the runner trusts its
+network position, exactly as the Ollama relay does. Jobs are addressed by
+unguessable 144-bit ids and are never listable. If your Kiln is on the open
+internet, put it behind the auth proxy you already use for the app itself.
 
 ## Development
 
 ```bash
 npm install
-npm run dev          # dev server with the same /api/ollama proxy
+npm run dev          # dev server with the same /api/ollama + /api/cloud proxies
+npm run cloud        # the cloud turn runner on :8090 (optional; pill hides without it)
 npm run build        # type-check + production build into dist/
 npm run preview      # serve the production build on :4173
 npm run icons        # regenerate PNG icons from public/icons/icon.svg
@@ -299,11 +339,15 @@ Export/Import, so a future backend can round-trip it.
 ## Honest limitations
 
 - **Backgrounding on iOS**: Safari suspends network for backgrounded PWAs, so
-  a stream can't keep running while you use another app. Kiln mitigates
-  rather than pretends: partial output is saved continuously, the chat is
-  marked *interrupted*, and **Continue generating** picks the answer back up.
-  The optional wake-lock setting avoids the interruption entirely for long
-  runs by keeping the screen on.
+  a *local* stream can't keep running while you use another app. Kiln
+  mitigates rather than pretends: partial output is saved continuously, the
+  chat is marked *interrupted*, and **Continue generating** picks the answer
+  back up. The optional wake-lock setting avoids the interruption by keeping
+  the screen on — and **Cloud** mode sidesteps it entirely, since the reply
+  isn't running on the phone at all. What cloud mode can't do is push: with
+  the app fully closed you won't get a notification when the reply finishes
+  (that needs Web Push, which Kiln doesn't do yet) — it's simply waiting,
+  complete, next time you open the app.
 - **Notifications on iOS** require the app to be installed to the Home
   Screen (iOS 16.4+), and Apple only reliably shows service-worker
   notifications for pushes; on Android/desktop they work as expected.

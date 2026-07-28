@@ -7,8 +7,10 @@ import { useApplyTheme, useAppTheme, useIsDark } from "@/hooks/use-theme"
 import { PipCanvas } from "@/pip/PipCanvas"
 import { useSettings } from "@/stores/settings"
 import { recoverInterrupted } from "@/lib/db"
+import { resumeCloudTurns } from "@/lib/engine"
 import { clearBadge } from "@/lib/notify"
 import { requestPersistentStorage, setupServiceWorker } from "@/lib/sw"
+import { useCloud } from "@/stores/cloud"
 import { useModels } from "@/stores/models"
 import ArtefactsPage from "@/pages/ArtefactsPage"
 import ChatPage from "@/pages/ChatPage"
@@ -28,7 +30,10 @@ export default function App() {
         await seedDemo()
         window.history.replaceState(null, "", "/")
       }
-      void recoverInterrupted()
+      // recover local casualties first, then collect what the cloud runner
+      // finished (or is still generating) while the app was away
+      void recoverInterrupted().then(() => resumeCloudTurns())
+      void useCloud.getState().probe()
       void useModels.getState().refresh()
       void requestPersistentStorage()
     }
@@ -36,10 +41,20 @@ export default function App() {
     setupServiceWorker()
     clearBadge()
     const onVisible = () => {
-      if (document.visibilityState === "visible") clearBadge()
+      if (document.visibilityState === "visible") {
+        clearBadge()
+        // an iOS PWA is frozen rather than reloaded — coming back to the
+        // foreground is the moment to catch up on cloud turns
+        void resumeCloudTurns()
+      }
     }
+    const onOnline = () => void resumeCloudTurns()
     document.addEventListener("visibilitychange", onVisible)
-    return () => document.removeEventListener("visibilitychange", onVisible)
+    window.addEventListener("online", onOnline)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("online", onOnline)
+    }
   }, [])
 
   return (

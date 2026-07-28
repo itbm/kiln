@@ -65,7 +65,14 @@ import {
   shareChatMarkdown,
   uploadChatToServer,
 } from "@/lib/sync"
-import type { Attachment, Chat, Effort, Message, ModelRef } from "@/lib/types"
+import type {
+  Attachment,
+  Chat,
+  ChatRuntime,
+  Effort,
+  Message,
+  ModelRef,
+} from "@/lib/types"
 import { uid } from "@/lib/utils"
 import { switchToVersion } from "@/lib/versions"
 import { useAppTheme } from "@/hooks/use-theme"
@@ -146,6 +153,7 @@ export default function ChatPage() {
 
   const lastModel = useSettings((s) => s.lastModel)
   const lastEffort = useSettings((s) => s.lastEffort)
+  const lastRuntime = useSettings((s) => s.lastRuntime)
   const hasKeys = useSettings((s) => !!s.openrouterKey || !!s.ollamaKey)
   const skills = useSettings((s) => s.skills)
   const defaultSkillIds = useMemo(
@@ -155,6 +163,7 @@ export default function ChatPage() {
 
   const [modelRef, setModelRef] = useState<ModelRef | null>(lastModel)
   const [effort, setEffort] = useState<Effort>(lastEffort)
+  const [runtime, setRuntime] = useState<ChatRuntime>(lastRuntime)
   const [pendingTemp, setPendingTemp] = useState(false)
   const [pendingSkills, setPendingSkills] = useState<string[]>(defaultSkillIds)
   const [artifact, setArtifact] = useState<ArtifactBlock | null>(null)
@@ -187,9 +196,11 @@ export default function ChatPage() {
           : lastModel,
       )
       setEffort(chat.effort ?? lastEffort)
+      setRuntime(chat.runtime ?? "local")
     } else if (!chatId) {
       setModelRef(lastModel)
       setEffort(lastEffort)
+      setRuntime(lastRuntime)
       setPendingTemp(false)
       setPendingSkills(defaultSkillIds)
     }
@@ -300,7 +311,10 @@ export default function ChatPage() {
     if (!modelRef) return
     nearBottom.current = true
     if (chat) {
-      void sendUserMessage({ chat, history: messages, text, attachments, modelRef, effort })
+      // carry the pill's current choice even if the live-query hasn't
+      // caught up with a just-made runtime change
+      const current: Chat = chat.temporary ? chat : { ...chat, runtime }
+      void sendUserMessage({ chat: current, history: messages, text, attachments, modelRef, effort })
     } else {
       const id = uid()
       const now = Date.now()
@@ -313,6 +327,8 @@ export default function ChatPage() {
         provider: modelRef.provider,
         model: modelRef.model,
         effort,
+        // ghost chats promise to stay off every disk — theirs and the server's
+        runtime: pendingTemp || runtime === "local" ? undefined : runtime,
         skillIds: pendingSkills,
         temporary: pendingTemp,
       }
@@ -338,7 +354,8 @@ export default function ChatPage() {
       if (!ok) return
     }
     nearBottom.current = true
-    void regenerateReply(chat, messages, msg, modelRef, effort)
+    const current: Chat = chat.temporary ? chat : { ...chat, runtime }
+    void regenerateReply(current, messages, msg, modelRef, effort)
   }
 
   /** The non-destructive version: carry on from this reply in a copy. */
@@ -382,7 +399,8 @@ export default function ChatPage() {
       if (!ok) return
     }
     nearBottom.current = true
-    void editUserMessage(chat, messages, msg, newText, modelRef, effort)
+    const current: Chat = chat.temporary ? chat : { ...chat, runtime }
+    void editUserMessage(current, messages, msg, newText, modelRef, effort)
   }
 
   const runCompact = async (instructions?: string) => {
@@ -460,6 +478,14 @@ export default function ChatPage() {
       if (chat.temporary) useTemp.getState().patchChat(chat.id, { skillIds: ids })
       else await db.chats.update(chat.id, { skillIds: ids })
     }
+  }
+
+  /** Local/Cloud choice: applies from the next turn, remembered for new chats. */
+  const changeRuntime = async (r: ChatRuntime) => {
+    setRuntime(r)
+    useSettings.getState().set({ lastRuntime: r })
+    if (chat && !chat.temporary)
+      await db.chats.update(chat.id, { runtime: r === "local" ? undefined : r })
   }
 
   const renameChat = async () => {
@@ -736,6 +762,12 @@ export default function ChatPage() {
               effort={effort}
               onModelChange={setModelRef}
               onEffortChange={setEffort}
+              runtime={runtime}
+              onRuntimeChange={
+                (chat?.temporary ?? (!chatId && pendingTemp))
+                  ? undefined
+                  : (r) => void changeRuntime(r)
+              }
               onSend={(t, a) => void send(t, a)}
               onStop={() => chatId && useStream.getState().stop(chatId)}
               onCommand={handleCommand}

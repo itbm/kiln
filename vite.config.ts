@@ -95,6 +95,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/ollama/, ""),
       },
+      // The cloud turn runner — run `node server/cloud.mjs` alongside dev.
+      // Without it the probe fails quietly and the Local/Cloud pill hides.
+      "/api/cloud": {
+        target: `http://127.0.0.1:${process.env.KILN_CLOUD_PORT ?? 8090}`,
+      },
     },
   },
   preview: {
@@ -103,6 +108,9 @@ export default defineConfig({
         target: "https://ollama.com",
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/ollama/, ""),
+      },
+      "/api/cloud": {
+        target: `http://127.0.0.1:${process.env.KILN_CLOUD_PORT ?? 8090}`,
       },
     },
   },

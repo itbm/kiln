@@ -21,10 +21,17 @@ class KilnDB extends Dexie {
 
 export const db = new KilnDB()
 
-/** Mark any messages left "streaming" by a killed session as interrupted. */
+/**
+ * Mark any messages left "streaming" by a killed session as interrupted.
+ * Messages carrying a cloudJobId are exempt: their turn lives on the server
+ * and resumeCloudTurns (lib/engine.ts) picks them back up instead.
+ */
 export async function recoverInterrupted(): Promise<void> {
   const stale = await db.messages
-    .filter((m) => m.status === "streaming" || m.status === "pending")
+    .filter(
+      (m) =>
+        (m.status === "streaming" || m.status === "pending") && !m.cloudJobId,
+    )
     .toArray()
   await Promise.all(
     stale.map((m) =>

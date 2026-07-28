@@ -54,6 +54,14 @@ export interface Usage {
 
 export type ChatKind = "chat" | "image"
 
+/**
+ * Where assistant turns run. "local" (default) streams from the provider on
+ * this device; "cloud" hands the turn to the Kiln server's runner so closing
+ * the app doesn't lose the reply — the device catches up and stores the
+ * result locally, as always.
+ */
+export type ChatRuntime = "local" | "cloud"
+
 export interface Chat {
   id: string
   kind: ChatKind
@@ -63,6 +71,8 @@ export interface Chat {
   provider?: ProviderId
   model?: string
   effort?: Effort
+  /** absent = "local" (also: temporary chats always run locally) */
+  runtime?: ChatRuntime
   skillIds?: string[]
   /** temporary chats are never written to the database */
   temporary?: boolean
@@ -126,6 +136,12 @@ export interface Message {
   error?: string
   createdAt: number
   editedAt?: number
+  /**
+   * The server-side job generating this reply (cloud runtime). Present only
+   * while the result hasn't been fully collected — cleared on finalisation,
+   * so its presence marks a turn that may still be running remotely.
+   */
+  cloudJobId?: string
   /** provider-reported tokens/cost for the active generation */
   usage?: Usage
   /** the user has submitted answers to this message's <questions> block */
@@ -207,6 +223,31 @@ export type StreamEvent =
   | { type: "image"; dataUrl: string }
   | { type: "tool_calls"; calls: WireToolCall[] }
   | { type: "done"; finish?: string; usage?: Usage }
+
+/**
+ * One event of an assistant turn, provider rounds and tool execution
+ * flattened into a single stream. The local engine loop yields these, and
+ * they are exactly the entries of the cloud runner's journal (which adds a
+ * `seq` number) — change them together with server/cloud.mjs.
+ *
+ * "reset" never appears in a journal: the client inserts it when it
+ * (re)attaches to a job, because a replay starts from the beginning and the
+ * accumulated message state must start over with it.
+ */
+export type TurnEvent =
+  | { t: "text"; x: string }
+  | { t: "reasoning"; x: string }
+  | { t: "image"; dataUrl: string }
+  | { t: "tool"; id: string; name: string; args: Record<string, unknown> }
+  | { t: "tool_result"; id: string; result: string; ok: boolean }
+  | { t: "usage"; usage: Usage }
+  | {
+      t: "final"
+      status: "done" | "stopped" | "error"
+      error?: string
+      reasoningMs?: number
+    }
+  | { t: "reset" }
 
 export interface ChatRequest {
   model: string

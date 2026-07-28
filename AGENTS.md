@@ -18,10 +18,12 @@ for the feature overview; this file is about working on the code.
 ## Commands
 
 ```bash
-npm run dev                    # dev server (has /api/ollama proxy)
+npm run dev                    # dev server (has /api/ollama + /api/cloud proxies)
+npm run cloud                  # cloud turn runner on :8090 (run beside dev/preview to see the pill)
 npm run build                  # type-check (tsc -b) + production build — must pass
-npm run preview                # serve dist/ on :4173 (needed by the two scripts below)
+npm run preview                # serve dist/ on :4173 (needed by the three scripts below)
 node scripts/e2e-mock.mjs      # end-to-end suite against a mocked provider — must pass
+node scripts/e2e-cloud.mjs     # cloud runtime end-to-end (spawns its own runner + mock) — must pass
 node scripts/verify-fresh.mjs  # first-run + key-gated live model fetch checks
 npm run shots                  # regenerate the screenshot set into shots/
 npm run icons                  # regenerate PWA icons from public/icons/icon.svg
@@ -51,6 +53,13 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   from the provider APIs, not hardcoded lists — see
   `src/lib/providers/*.ts`. When `ModelInfo` gains fields, bump
   `CACHE_VERSION` in `src/stores/models.ts` so stale caches refetch.
+- **`server/cloud.mjs` mirrors client code by design** (it's a
+  dependency-free plain-Node file, so it can't import from `src/`): the
+  provider stream parsing mirrors `src/lib/providers/*.ts`, the tool
+  execution mirrors `src/lib/tools.ts`, the round loop mirrors
+  `runLocalRounds` in `src/lib/engine.ts`, and its journal entries are the
+  `TurnEvent` type in `src/lib/types.ts`. Change any of those → mirror the
+  change in the runner, and keep `scripts/e2e-cloud.mjs` passing.
 - Providers are only contacted when the user has configured their key.
 - Inputs need `text-[16px]` on mobile (or the shared Input/Textarea
   components) to stop iOS zoom-on-focus. Use `confirmDialog`/`promptDialog`
@@ -71,6 +80,21 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
 
 - `src/lib/engine.ts` — the assistant turn loop: streaming, tools,
   versions, auto-compaction, titles. Persists partial output continuously.
+  One consumer (`consumeTurn`) applies a flat `TurnEvent` stream from either
+  driver: `runLocalRounds` (on-device provider calls + tools) or
+  `runCloudRounds` (attach to a server-side job's journal, re-attaching
+  through connection loss; a `reset` event precedes each replay).
+  `resumeCloudTurns` catches up on jobs after a relaunch — wired to boot,
+  foregrounding and `online` in `App.tsx`.
+- `src/lib/cloud.ts` + `src/stores/cloud.ts` + `server/cloud.mjs` — the
+  cloud runtime: chats flipped to **Cloud** (composer pill) POST the whole
+  turn to `/api/cloud/jobs`; the runner (same container, Node on
+  127.0.0.1:8090, memory-only) executes provider rounds + tools and
+  journals seq-numbered TurnEvents; clients replay/tail the journal over
+  SSE, then DELETE the job. Keys travel inside the job payload and are
+  scrubbed server-side when the turn ends. The store probes
+  `/api/cloud/health` once at boot; no runner → no pill. Temporary chats
+  never go cloud.
 - `src/lib/providers/` — OpenRouter (SSE) and Ollama (NDJSON) clients with
   a unified StreamEvent interface. Ollama cloud has no CORS; traffic goes
   through the same-origin `/api/ollama` relay (nginx in prod, Vite proxy in
@@ -120,4 +144,7 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   `compact.ts` is for context budgeting only.
 - `deploy/nginx.conf` + `Dockerfile` + `compose.yaml` — hardened
   runtime: read-only fs, tmpfs /tmp only, no access logs, no proxy
-  buffering to disk, cookies stripped on the relay.
+  buffering to disk, cookies stripped on the relay. The image also carries
+  the cloud runner: nginx proxies `/api/cloud/` → 127.0.0.1:8090
+  (buffering off — SSE), and the CMD keeps `node /opt/kiln/cloud.mjs`
+  running beside nginx with a restart loop.
