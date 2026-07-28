@@ -2,7 +2,7 @@
 // Tavily backend. Verifies streaming, the tool loop, artifact parsing,
 // persistence and title generation. Needs `npm run preview` on :4173.
 import { chromium } from "playwright"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 
 const BASE = "http://localhost:4173"
 mkdirSync("shots", { recursive: true })
@@ -847,6 +847,46 @@ await page.getByRole("button", { name: "Check for updates" }).click()
 await page.getByText("You're on the latest version.").waitFor({ timeout: 15000 })
 console.log("ok: manual update check reports up to date")
 await page.screenshot({ path: "shots/e2e-update-check.png" })
+
+// --- settings: "Update now" swaps the worker AND reloads the page ---
+// The regression this guards: an applied update used to activate silently —
+// no reload — so the button looked dead until the app was force-quit. The
+// worst case is a page the worker doesn't control (iOS standalone can cold-
+// launch uncontrolled): nothing fires controllerchange, so only the fallback
+// in applyUpdate reloads. Recreate it for real: drop the registration and
+// reload (uncontrolled page, worker reinstalls), plant a byte-different
+// sw.js, and apply the update the next check finds.
+const swPath = "dist/sw.js"
+const swOriginal = readFileSync(swPath, "utf8")
+await page.evaluate(async () => {
+  const reg = await navigator.serviceWorker.getRegistration()
+  await reg?.unregister()
+})
+await page.reload({ waitUntil: "networkidle" })
+await page.evaluate(() => navigator.serviceWorker.ready)
+writeFileSync(swPath, swOriginal + "\n// e2e-update-probe\n")
+const reloadedOnce = page.waitForEvent("load", { timeout: 20000 })
+await page.getByRole("button", { name: "Check for updates" }).click()
+await page.getByRole("button", { name: "Update now" }).click({ timeout: 20000 })
+await reloadedOnce
+console.log("ok: applying a found update reloads the app")
+// Swap back to the original worker the same way, so the suite ends with the
+// active worker matching dist/ (no stray update toasts in later tests) and
+// the controlled-page path — the one a user mid-session hits — is covered too.
+writeFileSync(swPath, swOriginal)
+const reloadedBack = page.waitForEvent("load", { timeout: 20000 })
+await page.getByRole("button", { name: "Check for updates" }).click()
+await page.getByRole("button", { name: "Update now" }).click({ timeout: 20000 })
+await reloadedBack
+console.log("ok: update applies from a controlled page too")
+assertTrue(
+  await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration()
+    return !!navigator.serviceWorker.controller && !!reg?.active && !reg.waiting
+  }),
+  "the new worker took control and nothing is left waiting",
+)
+await page.screenshot({ path: "shots/e2e-update-apply.png" })
 
 // --- key hygiene: a quoted .env-style paste is sanitised on input ---
 // (a quoted key reaches OpenRouter as `Bearer "sk-…"`, which 401s with a
