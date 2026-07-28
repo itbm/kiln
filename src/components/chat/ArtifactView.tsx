@@ -93,6 +93,51 @@ export function ArtifactCard({
   )
 }
 
+/** `&` must go first, or it would double-escape the entities added after it. */
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+}
+
+function escapeHtml(s: string): string {
+  return escapeAttr(s).replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+/** Blob URLs inherit the app's origin, so anything opened at the top level of
+ *  one can read localStorage (the API keys) and IndexedDB (every chat). A model
+ *  can be talked into writing a page that does exactly that — by a prompt
+ *  injection on a page it read, say — so artefact markup never becomes the
+ *  opened document itself. The tab gets a wrapper of our own inert HTML, and
+ *  the artefact goes inside a sandboxed frame with no `allow-same-origin`,
+ *  which is the same footing the in-app preview puts it on. */
+function openArtifactTab(artifact: ArtifactBlock) {
+  const revoke: string[] = []
+  let inner: string
+  if (artifact.type === "image/svg+xml") {
+    // an <img> never runs scripts in the SVG it renders — stronger than a sandbox
+    const svgUrl = URL.createObjectURL(
+      new Blob([artifact.content], { type: "image/svg+xml;charset=utf-8" }),
+    )
+    revoke.push(svgUrl)
+    inner = `<img src="${escapeAttr(svgUrl)}" alt="${escapeAttr(artifact.title)}">`
+  } else {
+    inner =
+      `<iframe sandbox="allow-scripts allow-popups allow-forms allow-modals"` +
+      ` srcdoc="${escapeAttr(artifact.content)}"></iframe>`
+  }
+  const wrapper = `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(artifact.title)}</title>
+<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100%;display:block}img{display:block;max-width:100%;margin:0 auto}</style>
+</head><body>${inner}</body></html>`
+  const url = URL.createObjectURL(new Blob([wrapper], { type: "text/html;charset=utf-8" }))
+  revoke.push(url)
+  // synchronously, or iOS treats it as a popup rather than a tap
+  window.open(url, "_blank", "noopener,noreferrer")
+  // long enough that reloading the opened tab still works, short enough that
+  // opening artefacts all day doesn't pile blobs up for the session
+  setTimeout(() => revoke.forEach((u) => URL.revokeObjectURL(u)), 600_000)
+}
+
 export function ArtifactViewer({
   artifact,
   onClose,
@@ -203,7 +248,13 @@ export function ArtifactViewer({
             variant="outline"
             size="sm"
             className="flex-1"
-            onClick={() => window.open(blobUrl, "_blank")}
+            onClick={() =>
+              artifact.type === "text/html" || artifact.type === "image/svg+xml"
+                ? openArtifactTab(artifact)
+                : // markdown and code open as text/plain — they cannot script,
+                  // so the blob is safe; noopener still severs window.opener
+                  window.open(blobUrl, "_blank", "noopener")
+            }
           >
             <ExternalLinkIcon /> Open
           </Button>

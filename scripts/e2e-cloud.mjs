@@ -40,9 +40,16 @@ function drip(res, events, ms) {
 
 // ---- mock upstream (OpenRouter + Tavily shapes) — only the cloud runner
 // talks to this; the browser never sees it ----
+/** anything reaching this is an SSRF the guard should have refused */
+let secretHits = 0
 const mock = createServer(async (req, res) => {
   let body = ""
   for await (const c of req) body += c
+  if (req.url === "/secret") {
+    secretHits++
+    res.writeHead(200, { "content-type": "text/plain" })
+    return res.end("TOP-SECRET-CANARY")
+  }
   if (req.url === "/search") {
     res.writeHead(200, { "content-type": "application/json" })
     return res.end(
@@ -66,6 +73,32 @@ const mock = createServer(async (req, res) => {
         chunk({}, "stop", { prompt_tokens: 50, completion_tokens: 100, cost: 0.005 }),
       ]
       return drip(res, events, 300)
+    }
+    if (/secret page/.test(marker) && !hasToolResult) {
+      // round 1: ask to fetch something only the container can reach
+      return res.end(
+        sse([
+          chunk({ role: "assistant", content: "" }),
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_ssrf",
+                function: {
+                  name: "web_fetch",
+                  arguments: JSON.stringify({
+                    url: `http://127.0.0.1:${MOCK_PORT}/secret`,
+                  }),
+                },
+              },
+            ],
+          }),
+          chunk({}, "tool_calls"),
+        ]),
+      )
+    }
+    if (/secret page/.test(marker)) {
+      return res.end(sse([chunk({ content: "I could not read that." }), chunk({}, "stop")]))
     }
     if (!hasToolResult) {
       // round 1: ask for a web search (executed server-side)
@@ -376,6 +409,56 @@ await page.reload({ waitUntil: "networkidle" })
 await page.getByText(/step \d/).first().waitFor({ timeout: 10000 })
 const reloaded = await readLastAssistant(page)
 check(reloaded?.status === "stopped", "stopped reply intact after reload")
+
+// --- the runner refuses to fetch the network it sits inside ---
+// The URL web_fetch is handed comes from the model, and anything the model
+// has read can steer it. On the phone that only reaches the user's own
+// network; here it would reach whatever else the container can see.
+const ssrfJob = await (
+  await fetch(`${CLOUD}/jobs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      provider: "openrouter",
+      model: "test/model",
+      effort: "auto",
+      messages: [{ role: "user", content: "Read me the secret page" }],
+      tools: [
+        {
+          name: "web_fetch",
+          description: "Fetch a URL",
+          parameters: {
+            type: "object",
+            properties: { url: { type: "string" } },
+            required: ["url"],
+          },
+        },
+      ],
+      keys: { provider: "k" },
+    }),
+  })
+).json()
+const ssrfEvents = await (async () => {
+  const res = await fetch(`${CLOUD}/jobs/${ssrfJob.id}/events?from=0`)
+  let text = ""
+  for await (const c of res.body) text += Buffer.from(c).toString()
+  return text
+    .split("\n")
+    .filter((l) => l.startsWith("data:"))
+    .map((l) => JSON.parse(l.slice(5)))
+})()
+check(
+  ssrfEvents.some(
+    (e) => e.t === "tool_result" && /private or internal address/.test(e.result ?? ""),
+  ),
+  "web_fetch refuses a private address and says so to the model",
+)
+check(
+  !JSON.stringify(ssrfEvents).includes("TOP-SECRET"),
+  "nothing from the internal page reached the journal",
+)
+check(secretHits === 0, `the internal page was never requested (${secretHits} hits)`)
+await fetch(`${CLOUD}/jobs/${ssrfJob.id}`, { method: "DELETE" })
 
 check(browserChatCalls <= 2 && browserChatCalls >= 1, `browser only made title calls (${browserChatCalls})`)
 check(errors.length === 0, `no page errors (${errors.join("; ") || "none"})`)

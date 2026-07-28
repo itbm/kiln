@@ -27,6 +27,8 @@
  */
 import { createServer } from "node:http"
 import { randomBytes } from "node:crypto"
+import { lookup } from "node:dns/promises"
+import { isIP } from "node:net"
 
 const PORT = Number(process.env.PORT ?? 8090)
 const OPENROUTER_BASE =
@@ -216,6 +218,9 @@ async function* streamOpenRouter(cfg, signal) {
   const toolAcc = new Map()
   let finish
   let usage
+  // a stream that parsed as nothing at all is a failure, not an empty reply
+  let parseFailures = 0
+  let sawEvent = false
   for await (const line of lines(res.body, signal)) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:"))
@@ -226,6 +231,7 @@ async function* streamOpenRouter(cfg, signal) {
     try {
       json = JSON.parse(payload)
     } catch {
+      parseFailures++
       continue
     }
     if (json.error) throw new Error(json.error.message ?? "Provider error")
@@ -248,15 +254,23 @@ async function* streamOpenRouter(cfg, signal) {
     const choice = json.choices?.[0]
     if (!choice) continue
     const delta = choice.delta ?? {}
-    if (typeof delta.reasoning === "string" && delta.reasoning)
+    if (typeof delta.reasoning === "string" && delta.reasoning) {
+      sawEvent = true
       yield { type: "reasoning", text: delta.reasoning }
-    if (typeof delta.content === "string" && delta.content)
+    }
+    if (typeof delta.content === "string" && delta.content) {
+      sawEvent = true
       yield { type: "text", text: delta.content }
+    }
     for (const img of delta.images ?? []) {
       const url = img?.image_url?.url
-      if (url) yield { type: "image", dataUrl: url }
+      if (url) {
+        sawEvent = true
+        yield { type: "image", dataUrl: url }
+      }
     }
     for (const tc of delta.tool_calls ?? []) {
+      sawEvent = true
       const idx = tc.index ?? 0
       const acc = toolAcc.get(idx) ?? { id: "", name: "", args: "" }
       if (tc.id) acc.id = tc.id
@@ -266,6 +280,11 @@ async function* streamOpenRouter(cfg, signal) {
     }
     if (choice.finish_reason) finish = choice.finish_reason
   }
+  // an empty reply is fine; an empty reply out of unreadable frames is not
+  if (parseFailures && !sawEvent)
+    throw new Error(
+      `The provider sent an unreadable stream (${parseFailures} malformed ${parseFailures === 1 ? "line" : "lines"}) — try again`,
+    )
   if (finish === "tool_calls" && toolAcc.size) {
     const calls = [...toolAcc.entries()]
       .sort((a, b) => a[0] - b[0])
@@ -281,8 +300,12 @@ function ollamaMessages(messages) {
     if (m.role === "tool")
       return { role: "tool", content: m.content, tool_name: m.toolName }
     const out = { role: m.role, content: m.content }
+    // mirrors dataUrlToBase64 in src/lib/utils.ts
     if (m.images?.length)
-      out.images = m.images.map((d) => d.slice(d.indexOf(",") + 1))
+      out.images = m.images.map((d) => {
+        const i = d.indexOf(",")
+        return i >= 0 ? d.slice(i + 1) : d
+      })
     if (m.role === "assistant" && m.toolCalls?.length) {
       out.tool_calls = m.toolCalls.map((c) => ({
         function: { name: c.name, arguments: safeParse(c.args) },
@@ -369,21 +392,30 @@ async function* streamOllama(cfg, signal) {
 
   let finish
   let usage
+  // a stream that parsed as nothing at all is a failure, not an empty reply
+  let parseFailures = 0
+  let sawEvent = false
   for await (const line of lines(res.body, signal)) {
     if (!line.trim()) continue
     let json
     try {
       json = JSON.parse(line)
     } catch {
+      parseFailures++
       continue
     }
     if (json.error) throw new Error(json.error)
     const msg = json.message ?? {}
-    if (typeof msg.thinking === "string" && msg.thinking)
+    if (typeof msg.thinking === "string" && msg.thinking) {
+      sawEvent = true
       yield { type: "reasoning", text: msg.thinking }
-    if (typeof msg.content === "string" && msg.content)
+    }
+    if (typeof msg.content === "string" && msg.content) {
+      sawEvent = true
       yield { type: "text", text: msg.content }
+    }
     if (Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
+      sawEvent = true
       yield {
         type: "tool_calls",
         calls: msg.tool_calls.map((tc, i) => ({
@@ -406,6 +438,11 @@ async function* streamOllama(cfg, signal) {
       }
     }
   }
+  // an empty reply is fine; an empty reply out of unreadable frames is not
+  if (parseFailures && !sawEvent)
+    throw new Error(
+      `The provider sent an unreadable stream (${parseFailures} malformed ${parseFailures === 1 ? "line" : "lines"}) — try again`,
+    )
   yield { type: "done", finish, usage }
 }
 
@@ -502,8 +539,138 @@ async function webSearch(cfg, query, signal) {
   return out.slice(0, MAX_TOOL_RESULT)
 }
 
+/* ---------- SSRF guard ----------
+ * The URL web_fetch is given comes from the model, which anything it has read
+ * can steer — a page fetched earlier only has to say "now fetch this". On the
+ * phone that reaches the user's own network and no further, but here it runs
+ * inside the container, next to whatever else the host can see (other
+ * services, 169.254.169.254 on a cloud box). So the direct path resolves the
+ * name first and refuses anything that lands on a private or reserved
+ * address, and re-checks after every redirect, since a public URL that
+ * redirects inward is the usual way round a check like this.
+ *
+ * What this does not close is DNS rebinding: the name could resolve
+ * differently between our lookup and fetch's own. Pinning the address means
+ * hand-rolling an HTTP client (fetch won't let us set Host, and undici's
+ * Agent isn't reachable from node: builtins), which is out of proportion for
+ * a runner that already trusts its network position — see the README.
+ */
+const V4_BLOCKED = [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["224.0.0.0", 4],
+  ["240.0.0.0", 4],
+]
+const V6_BLOCKED = [
+  ["::", 128],
+  ["::1", 128],
+  ["64:ff9b::", 96],
+  ["fc00::", 7],
+  ["fe80::", 10],
+  ["fec0::", 10],
+  ["ff00::", 8],
+]
+
+function v4ToInt(addr) {
+  const p = addr.split(".").map(Number)
+  return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0
+}
+
+function v6ToBigInt(addr) {
+  let a = addr.split("%")[0]
+  // ::ffff:1.2.3.4 — fold the dotted tail into two hex groups
+  const m = a.match(/^(.*:)((?:\d{1,3}\.){3}\d{1,3})$/)
+  if (m) {
+    const v = m[2].split(".").map(Number)
+    a = `${m[1]}${(((v[0] << 8) | v[1]) >>> 0).toString(16)}:${(((v[2] << 8) | v[3]) >>> 0).toString(16)}`
+  }
+  const [head, tail] = a.split("::")
+  const h = head ? head.split(":").filter(Boolean) : []
+  const t = tail === undefined ? null : tail ? tail.split(":").filter(Boolean) : []
+  const parts =
+    t === null ? h : [...h, ...Array(8 - h.length - t.length).fill("0"), ...t]
+  let n = 0n
+  for (const p of parts) n = (n << 16n) | BigInt(parseInt(p || "0", 16))
+  return n
+}
+
+function isPrivateV4(n) {
+  return V4_BLOCKED.some(
+    ([base, bits]) => n >>> (32 - bits) === v4ToInt(base) >>> (32 - bits),
+  )
+}
+
+function isPrivateAddress(addr) {
+  const fam = isIP(addr)
+  if (fam === 4) return isPrivateV4(v4ToInt(addr))
+  if (fam !== 6) return true // unparseable — refuse rather than guess
+  const n = v6ToBigInt(addr)
+  // IPv4-mapped (::ffff:0:0/96): judge the address it actually carries
+  if (n >> 32n === 0xffffn) return isPrivateV4(Number(n & 0xffffffffn))
+  return V6_BLOCKED.some(([base, bits]) => {
+    const shift = BigInt(128 - bits)
+    return n >> shift === v6ToBigInt(base) >> shift
+  })
+}
+
+/** null when the URL is safe to fetch, otherwise the tool result to return */
+async function assertPublicUrl(raw) {
+  let u
+  try {
+    u = new URL(raw)
+  } catch {
+    return "Error: URL must start with http(s)://"
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:")
+    return "Error: URL must start with http(s)://"
+  const host = u.hostname.replace(/^\[|\]$/g, "")
+  let addrs
+  if (isIP(host)) addrs = [host]
+  else {
+    try {
+      addrs = (await lookup(host, { all: true })).map((a) => a.address)
+    } catch {
+      return `Fetch failed: could not resolve ${u.hostname}`
+    }
+  }
+  // every answer must be public — a name can hand back more than one
+  if (!addrs.length || addrs.some(isPrivateAddress))
+    return `Error: ${u.href} resolves to a private or internal address, so it was not fetched.`
+  return null
+}
+
+/** read at most `max` bytes — the result is truncated to 9000 chars anyway,
+ *  and a hostile response shouldn't get to balloon the runner's memory */
+async function readCapped(res, max = 256 * 1024) {
+  if (!res.body) return ""
+  const reader = res.body.getReader()
+  const chunks = []
+  let total = 0
+  try {
+    while (total < max) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.length
+      chunks.push(value)
+    }
+  } finally {
+    await reader.cancel().catch(() => {})
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks))
+}
+
 async function webFetch(url, signal) {
-  if (!/^https?:\/\//i.test(url)) return "Error: URL must start with http(s)://"
+  const blocked = await assertPublicUrl(url)
+  // checked before anything leaves the process, so a blocked URL isn't
+  // handed to the reader service either
+  if (blocked) return blocked
   // r.jina.ai converts pages to clean markdown; here it's for the markdown,
   // not CORS (the server has no such constraint)
   try {
@@ -512,16 +679,31 @@ async function webFetch(url, signal) {
       signal: withTimeout(signal, 25_000),
     })
     if (res.ok) {
-      const text = await res.text()
+      const text = await readCapped(res)
       if (text.trim()) return truncate(text)
     }
   } catch {
     /* fall through to direct fetch */
   }
   try {
-    const res = await fetch(url, { signal: withTimeout(signal, 15_000) })
-    if (!res.ok) return `Fetch failed: HTTP ${res.status}`
-    return truncate(stripHtml(await res.text()))
+    let current = url
+    for (let hop = 0; hop < 5; hop++) {
+      const res = await fetch(current, {
+        signal: withTimeout(signal, 15_000),
+        redirect: "manual",
+      })
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get("location")
+        if (!loc) return `Fetch failed: HTTP ${res.status}`
+        current = new URL(loc, current).href
+        const bad = await assertPublicUrl(current)
+        if (bad) return bad
+        continue
+      }
+      if (!res.ok) return `Fetch failed: HTTP ${res.status}`
+      return truncate(stripHtml(await readCapped(res)))
+    }
+    return "Fetch failed: too many redirects"
   } catch (e) {
     return `Fetch failed: ${e instanceof Error ? e.message : "network error"}`
   }
@@ -601,8 +783,32 @@ async function runJob(job) {
       // record the tool-call turn, run the tools, feed results back
       cfg.messages.push({ role: "assistant", content, toolCalls })
       for (const call of toolCalls) {
-        const args = safeParse(call.args)
+        // running the tool on {} invents a call the model never made; telling
+        // it the arguments were malformed lets it correct itself instead
+        // (mirrors runLocalRounds in src/lib/engine.ts)
+        let args = {}
+        let argsError
+        try {
+          args = JSON.parse(call.args || "{}")
+        } catch {
+          argsError = `Error: the tool call arguments were not valid JSON — retry the call with corrected JSON. Raw arguments: ${String(call.args).slice(0, 200)}`
+        }
         emit(job, { t: "tool", id: call.id, name: call.name, args })
+        if (argsError) {
+          emit(job, {
+            t: "tool_result",
+            id: call.id,
+            result: argsError,
+            ok: false,
+          })
+          cfg.messages.push({
+            role: "tool",
+            content: argsError,
+            toolCallId: call.id,
+            toolName: call.name,
+          })
+          continue
+        }
         try {
           const result = await executeTool(cfg, call.name, args, signal)
           emit(job, { t: "tool_result", id: call.id, result, ok: true })

@@ -13,6 +13,17 @@ const appVersion = readFileSync(
   "utf8",
 ).trim()
 
+// Mirrors the headers nginx serves in production (deploy/nginx.conf) so dev,
+// `npm run preview` and the e2e suites all run under the same policy — a CSP
+// that broke the app would otherwise only show up after a deploy.
+const SECURITY_HEADERS = {
+  "Content-Security-Policy":
+    "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+}
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
@@ -93,6 +104,7 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "./src") },
   },
   server: {
+    headers: SECURITY_HEADERS,
     proxy: {
       // Same-origin proxy for Ollama cloud (ollama.com has no CORS support).
       // In production the bundled nginx config provides the same route.
@@ -109,6 +121,7 @@ export default defineConfig({
     },
   },
   preview: {
+    headers: SECURITY_HEADERS,
     proxy: {
       "/api/ollama": {
         target: "https://ollama.com",

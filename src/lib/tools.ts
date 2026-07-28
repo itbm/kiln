@@ -67,7 +67,9 @@ async function webSearch(query: string, signal?: AbortSignal): Promise<string> {
       max_results: 6,
       include_answer: "basic",
     }),
-    signal,
+    // without this a hung Tavily holds the whole turn open — mirrors the
+    // same timeout in server/cloud.mjs
+    signal: withTimeout(signal, 30_000),
   })
   if (!res.ok) return `Search failed: HTTP ${res.status}`
   const json = await res.json()
@@ -80,6 +82,11 @@ async function webSearch(query: string, signal?: AbortSignal): Promise<string> {
   return out.slice(0, MAX_TOOL_RESULT)
 }
 
+// No private-address guard here, unlike the cloud runner's copy: this runs in
+// the user's own browser against their own network, which they can reach from
+// the address bar anyway, and CORS already stands in the way. Manual redirect
+// handling — what the server re-checks each hop with — yields opaque responses
+// in a browser, so the check couldn't be made to work here regardless.
 async function webFetch(url: string, signal?: AbortSignal): Promise<string> {
   if (!/^https?:\/\//i.test(url)) return "Error: URL must start with http(s)://"
   // r.jina.ai converts pages to clean markdown and allows browser CORS,

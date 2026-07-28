@@ -60,6 +60,10 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   `runLocalRounds` in `src/lib/engine.ts`, and its journal entries are the
   `TurnEvent` type in `src/lib/types.ts`. Change any of those → mirror the
   change in the runner, and keep `scripts/e2e-cloud.mjs` passing.
+  Two asymmetries are deliberate, not drift to be tidied away: the runner's
+  `web_fetch` refuses private/reserved addresses (the client's reaches only
+  the user's own network, and a browser can't inspect redirect hops anyway),
+  and its `stripHtml` is a regex because there's no DOM to parse with.
 - Providers are only contacted when the user has configured their key.
 - Inputs need `text-[16px]` on mobile (or the shared Input/Textarea
   components) to stop iOS zoom-on-focus. Use `confirmDialog`/`promptDialog`

@@ -876,7 +876,13 @@ export default function SettingsPage() {
               const f = e.target.files?.[0]
               if (f)
                 importData(f)
-                  .then((n) => toast.success(`Imported ${n} chat${n === 1 ? "" : "s"}`))
+                  .then(({ chats, skipped }) => {
+                    toast.success(`Imported ${chats} chat${chats === 1 ? "" : "s"}`)
+                    if (skipped)
+                      toast.warning(
+                        `Skipped ${skipped} invalid record${skipped === 1 ? "" : "s"}`,
+                      )
+                  })
                   .catch((err) => toast.error(err.message))
               e.target.value = ""
             }}
