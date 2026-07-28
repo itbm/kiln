@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { DEFAULT_THEME_ID } from "@/lib/themes"
-import type { Effort, ModelRef, Skill } from "@/lib/types"
+import type { ChatRuntime, Effort, ModelRef, Skill } from "@/lib/types"
 import { cleanKey, uid } from "@/lib/utils"
 
 export type ThemePref = "system" | "light" | "dark"
@@ -30,6 +30,8 @@ interface SettingsState {
   skills: Skill[]
   lastModel: ModelRef | null
   lastEffort: Effort
+  /** default Local/Cloud choice for new chats */
+  lastRuntime: ChatRuntime
   lastImageModel: ModelRef | null
   /** null = use the chat's own model (utility model: titles + compaction) */
   titleModel: ModelRef | null
@@ -66,6 +68,7 @@ export const useSettings = create<SettingsState>()(
       skills: [],
       lastModel: null,
       lastEffort: "auto",
+      lastRuntime: "local",
       lastImageModel: null,
       titleModel: null,
       generateTitles: true,
