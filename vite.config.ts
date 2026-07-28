@@ -80,6 +80,12 @@ export default defineConfig({
           /^\/\.pomerium\//,
         ],
         cleanupOutdatedCaches: true,
+        // The plugin only turns this on for autoUpdate mode. In prompt mode
+        // a freshly-activated worker would otherwise leave already-open pages
+        // (and iOS standalone launches that come up uncontrolled) unclaimed,
+        // so the controllerchange that applyUpdate (src/lib/sw.ts) reloads on
+        // would never fire for them.
+        clientsClaim: true,
       },
     }),
   ],

@@ -96,9 +96,41 @@ export function setupServiceWorker(): void {
   })
 }
 
-/** Swap to the downloaded version and reload the app. */
+const APPLY_RELOAD_FALLBACK = 3000
+
+/**
+ * Swap to the downloaded version and reload the app.
+ *
+ * The reload has to be ours. vite-plugin-pwa's prompt-mode client only
+ * reloads when workbox-window credits the new worker to this page's own
+ * register() call — and every update our checks find lands minutes to hours
+ * after registration, past workbox-window's 60-second heuristic, so it's
+ * filed as "external" and the plugin's reload guard skips it. The worker
+ * still activated (the SKIP_WAITING message does go through), which is why
+ * killing and relaunching the app used to pick the update up while the
+ * button looked dead. controllerchange is the moment the new worker takes
+ * the page over; the timer covers the cases where that never fires — a page
+ * the worker doesn't control (iOS can cold-launch standalone apps
+ * uncontrolled) or a tap after the swap already happened — where a plain
+ * reload still lands on the new version.
+ */
 export function applyUpdate(): void {
-  void updateSW?.(true)
+  let reloaded = false
+  const reload = () => {
+    if (reloaded) return
+    reloaded = true
+    window.location.reload()
+  }
+  if (!("serviceWorker" in navigator)) {
+    reload()
+    return
+  }
+  navigator.serviceWorker.addEventListener("controllerchange", reload, {
+    once: true,
+  })
+  setTimeout(reload, APPLY_RELOAD_FALLBACK)
+  if (updateSW) void updateSW(true)
+  else registration?.waiting?.postMessage({ type: "SKIP_WAITING" })
 }
 
 // Self-hosted instances often sit behind a login proxy (Cloudflare Access,
