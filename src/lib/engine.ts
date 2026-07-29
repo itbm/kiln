@@ -19,7 +19,7 @@ import { contentWithoutArtifacts } from "./artifacts"
 import { findEmotion } from "./emotions"
 import { pip } from "@/pip/bus"
 import { notifyChatDone, acquireWakeLock, releaseWakeLock } from "./notify"
-import { estimateWireTokens, compactChat } from "./compact"
+import { estimateWireTokens, compactChat, NothingToCompact } from "./compact"
 import { addUsage } from "./usage"
 import { beginNewVersion } from "./versions"
 import {
@@ -111,6 +111,10 @@ async function maybeAutoCompact(
     )
     return updated
   } catch (e) {
+    // finding nothing to summarise is a normal outcome of looking, not a
+    // failure — the estimate can cross the threshold while every message is
+    // still inside the keep-recent window
+    if (e instanceof NothingToCompact) return chat
     // sending uncompacted usually still works; when it doesn't, the provider's
     // context error is the first thing the user sees and reads as unexplained
     toast.warning("Auto-compaction failed — sending the conversation uncompacted", {

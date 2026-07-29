@@ -327,6 +327,14 @@ console.log("ok: caption expands to the full token breakdown")
 await usageDetail.click() // collapse again
 await page.screenshot({ path: "shots/e2e-stream-result.png" })
 
+// Auto-compaction looks at every send, and on this tiny 700-token context it
+// finds nothing to summarise for a while — a normal outcome of looking, which
+// must not surface as a failure. (It used to, which only a screenshot caught.)
+assertTrue(
+  (await page.getByText("Auto-compaction failed").count()) === 0,
+  "no compaction warning when there was simply nothing to compact",
+)
+
 // artifact viewer opens with rendered markdown
 await page.getByText("Espresso beans — quick guide").click()
 await page.getByRole("tab", { name: "Source" }).waitFor({ timeout: 5000 })

@@ -44,6 +44,11 @@ export interface CompactResult {
   summarizedCount: number
 }
 
+/** Everything is already inside the keep-recent window, so there is nothing
+ *  to summarise. Worth saying when the user asked for it (`/compact`); not
+ *  worth a word when auto-compaction merely looked and found no work. */
+export class NothingToCompact extends Error {}
+
 async function patchChat(chat: Chat, patch: Partial<Chat>): Promise<Chat> {
   if (chat.temporary) useTemp.getState().patchChat(chat.id, patch)
   else await db.chats.update(chat.id, patch)
@@ -66,7 +71,7 @@ export async function compactChat(
     (m) => m.createdAt > cutoff && (m.content || m.attachments?.length),
   )
   const toSummarize = candidates.slice(0, Math.max(candidates.length - keep, 0))
-  if (!toSummarize.length) throw new Error("Nothing to compact yet")
+  if (!toSummarize.length) throw new NothingToCompact("Nothing to compact yet")
 
   const transcript = toSummarize
     .map((m) => {
