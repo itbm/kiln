@@ -24,6 +24,12 @@ interface SettingsState {
   /** "/api/ollama" (same-origin proxy, default) or a direct URL (e.g. LAN Ollama) */
   ollamaBaseUrl: string
   tavilyKey: string
+  /**
+   * GitHub personal access token for code chats — repo and branch listing run
+   * on the device against api.github.com, and the token is handed to the
+   * sandbox per turn. Scope it to the repositories you actually want coded in.
+   */
+  githubToken: string
   /** null = built-in default */
   systemPrompt: string | null
   personalization: Personalization
@@ -63,6 +69,7 @@ export const useSettings = create<SettingsState>()(
       ollamaKey: "",
       ollamaBaseUrl: "/api/ollama",
       tavilyKey: "",
+      githubToken: "",
       systemPrompt: null,
       personalization: { enabled: true, name: "", role: "", notes: "" },
       skills: [],
@@ -99,13 +106,22 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "amber-settings",
-      version: 1,
+      version: 2,
       // v1: keys saved before cleanKey handled quotes/prefixes (or via old
       // builds that stored raw input) get sanitised once on load, so a
-      // whitespace-only or quote-wrapped key can't linger as "configured"
+      // whitespace-only or quote-wrapped key can't linger as "configured".
+      // v2: githubToken joins the list. Nothing persisted at v1 has one, so
+      // this is forward cover for imports and legacy writes rather than a
+      // repair — the loop no-ops on absent fields, and cleanKey is idempotent
+      // so re-running it over the older keys is harmless.
       migrate: (persisted) => {
         const st = persisted as Record<string, unknown>
-        for (const f of ["openrouterKey", "ollamaKey", "tavilyKey"] as const)
+        for (const f of [
+          "openrouterKey",
+          "ollamaKey",
+          "tavilyKey",
+          "githubToken",
+        ] as const)
           if (typeof st[f] === "string") st[f] = cleanKey(st[f] as string)
         return st
       },

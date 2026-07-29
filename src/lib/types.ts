@@ -1,3 +1,6 @@
+// Type-only import: erased at compile time, so types.ts stays a runtime leaf.
+import type { QuestionSpec } from "./questions"
+
 export type ProviderId = "openrouter" | "ollama"
 
 /**
@@ -52,7 +55,20 @@ export interface Usage {
   genMs?: number
 }
 
-export type ChatKind = "chat" | "image"
+export type ChatKind = "chat" | "image" | "code"
+
+/**
+ * The repository a code chat works in. `baseBranch` is what the user picked
+ * and is never written to; `workBranch` is where the agent's commits land.
+ */
+export interface CodeRepo {
+  owner: string
+  name: string
+  defaultBranch: string
+  baseBranch: string
+  workBranch: string
+  private: boolean
+}
 
 /**
  * Where assistant turns run. "local" (default) streams from the provider on
@@ -83,6 +99,12 @@ export interface Chat {
   /** compaction: summary of messages with createdAt <= summaryCutoff */
   summary?: string
   summaryCutoff?: number
+  /** code chats: the repository and branches this chat works in */
+  repo?: CodeRepo
+  /** code chats: the sbx sandbox currently serving this chat, if any */
+  sandboxName?: string
+  /** code chats: the harness session to resume after a process or VM restart */
+  agentSessionId?: string
 }
 
 export type AttachmentKind = "image" | "text" | "pdf"
@@ -142,6 +164,12 @@ export interface Message {
    * so its presence marks a turn that may still be running remotely.
    */
   cloudJobId?: string
+  /**
+   * The server-side job generating this reply (code chats). Mirrors
+   * cloudJobId: present only while the result hasn't been collected, so its
+   * presence marks a turn that may still be running in a sandbox.
+   */
+  forgeJobId?: string
   /** provider-reported tokens/cost for the active generation */
   usage?: Usage
   /** the user has submitted answers to this message's <questions> block */
@@ -248,6 +276,23 @@ export type TurnEvent =
       reasoningMs?: number
     }
   | { t: "reset" }
+  /* --- code chats (forge runtime) --- */
+  /** the harness session id, so a later turn can resume it */
+  | { t: "session"; id: string }
+  /**
+   * The agent needs an answer before it can continue: a permission prompt or
+   * an AskUserQuestion. Rendered by the existing <questions> chip UI, and
+   * answered back through the forge's /reply route.
+   */
+  | { t: "ask"; requestId: string; kind: "permission" | "question"; questions: QuestionSpec[] }
+  /** work pushed to a branch */
+  | {
+      t: "branch"
+      name: string
+      url: string
+      commits: number
+      filesChanged: number
+    }
 
 export interface ChatRequest {
   model: string

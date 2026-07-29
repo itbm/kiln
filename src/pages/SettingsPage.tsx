@@ -43,6 +43,7 @@ import { db } from "@/lib/db"
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts"
 import { checkOpenRouterKey } from "@/lib/providers/openrouter"
 import { checkOllamaKey } from "@/lib/providers/ollama"
+import { checkGithubToken } from "@/lib/github"
 import { ensureNotificationPermission } from "@/lib/notify"
 import {
   applyUpdate,
@@ -524,6 +525,32 @@ export default function SettingsPage() {
             onChange={(v) => s.set({ tavilyKey: v })}
             placeholder="tvly-…"
           />
+          <div className="space-y-1.5">
+            <KeyInput
+              label="GitHub token (coding)"
+              value={s.githubToken}
+              onChange={(v) => s.set({ githubToken: v })}
+              placeholder="github_pat_…"
+              onVerify={() => checkGithubToken(s.githubToken)}
+            />
+            <p className="text-[12px] leading-snug text-muted-foreground">
+              Enables code chats. Repositories and branches are listed from this
+              device; the token is also handed to the sandbox that runs the
+              coding agent, so use a{" "}
+              <a
+                className="text-primary underline underline-offset-2"
+                href="https://github.com/settings/personal-access-tokens/new"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                fine-grained token
+              </a>{" "}
+              granted only to the repositories you want coded in, with{" "}
+              <span className="font-mono">Contents: read and write</span>. An
+              agent with a shell can read its own credentials — don't give it
+              more reach than the job needs.
+            </p>
+          </div>
         </Section>
 
         <Section
