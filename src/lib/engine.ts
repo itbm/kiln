@@ -19,7 +19,7 @@ import { contentWithoutArtifacts } from "./artifacts"
 import { findEmotion } from "./emotions"
 import { pip } from "@/pip/bus"
 import { notifyChatDone, acquireWakeLock, releaseWakeLock } from "./notify"
-import { estimateWireTokens, compactChat } from "./compact"
+import { estimateWireTokens, compactChat, NothingToCompact } from "./compact"
 import { addUsage } from "./usage"
 import { beginNewVersion } from "./versions"
 import {
@@ -110,7 +110,16 @@ async function maybeAutoCompact(
       `Auto-compacted ${summarizedCount} older message${summarizedCount === 1 ? "" : "s"} to fit the model's context`,
     )
     return updated
-  } catch {
+  } catch (e) {
+    // finding nothing to summarise is a normal outcome of looking, not a
+    // failure — the estimate can cross the threshold while every message is
+    // still inside the keep-recent window
+    if (e instanceof NothingToCompact) return chat
+    // sending uncompacted usually still works; when it doesn't, the provider's
+    // context error is the first thing the user sees and reads as unexplained
+    toast.warning("Auto-compaction failed — sending the conversation uncompacted", {
+      description: e instanceof Error ? e.message : undefined,
+    })
     return chat // best-effort: send anyway
   }
 }
@@ -291,12 +300,25 @@ async function* runLocalRounds(
     wire.push({ role: "assistant", content, toolCalls })
     for (const call of toolCalls) {
       let args: Record<string, unknown> = {}
+      let argsError: string | undefined
       try {
         args = JSON.parse(call.args || "{}")
       } catch {
-        /* leave empty */
+        // running the tool on {} invents a call the model never made; telling
+        // it the arguments were malformed lets it correct itself instead
+        argsError = `Error: the tool call arguments were not valid JSON — retry the call with corrected JSON. Raw arguments: ${call.args.slice(0, 200)}`
       }
       yield { t: "tool", id: call.id, name: call.name, args }
+      if (argsError) {
+        yield { t: "tool_result", id: call.id, result: argsError, ok: false }
+        wire.push({
+          role: "tool",
+          content: argsError,
+          toolCallId: call.id,
+          toolName: call.name,
+        })
+        continue
+      }
       try {
         const result = await executeTool(call.name, args, signal)
         yield { t: "tool_result", id: call.id, result, ok: true }

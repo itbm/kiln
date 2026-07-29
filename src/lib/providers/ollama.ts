@@ -7,6 +7,7 @@ import type {
 } from "@/lib/types"
 import { cleanKey, dataUrlToBase64, uid } from "@/lib/utils"
 import { getSettings } from "@/stores/settings"
+import { streamLines } from "./stream"
 
 function base(): string {
   return (getSettings().ollamaBaseUrl || "https://ollama.com").replace(
@@ -188,56 +189,60 @@ export async function* streamOllama(
   }
   if (!res.body) throw new Error("No response body")
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buf = ""
   let finish: string | undefined
   let usage: Usage | undefined
+  // a stream that parsed as nothing at all is a failure, not an empty reply
+  let parseFailures = 0
+  let sawEvent = false
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buf += decoder.decode(value, { stream: true })
-    const lines = buf.split("\n")
-    buf = lines.pop() ?? ""
-    for (const line of lines) {
-      if (!line.trim()) continue
-      let json: any
-      try {
-        json = JSON.parse(line)
-      } catch {
-        continue
+  for await (const line of streamLines(res.body, req.signal)) {
+    if (!line.trim()) continue
+    let json: any
+    try {
+      json = JSON.parse(line)
+    } catch {
+      parseFailures++
+      continue
+    }
+    if (json.error) throw new Error(json.error)
+    const msg = json.message ?? {}
+    if (typeof msg.thinking === "string" && msg.thinking) {
+      sawEvent = true
+      yield { type: "reasoning", text: msg.thinking }
+    }
+    if (typeof msg.content === "string" && msg.content) {
+      sawEvent = true
+      yield { type: "text", text: msg.content }
+    }
+    if (Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
+      sawEvent = true
+      yield {
+        type: "tool_calls",
+        calls: msg.tool_calls.map((tc: any) => ({
+          id: tc.id ?? uid(),
+          name: tc.function?.name ?? "",
+          args: JSON.stringify(tc.function?.arguments ?? {}),
+        })),
       }
-      if (json.error) throw new Error(json.error)
-      const msg = json.message ?? {}
-      if (typeof msg.thinking === "string" && msg.thinking)
-        yield { type: "reasoning", text: msg.thinking }
-      if (typeof msg.content === "string" && msg.content)
-        yield { type: "text", text: msg.content }
-      if (Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
-        yield {
-          type: "tool_calls",
-          calls: msg.tool_calls.map((tc: any) => ({
-            id: tc.id ?? uid(),
-            name: tc.function?.name ?? "",
-            args: JSON.stringify(tc.function?.arguments ?? {}),
-          })),
-        }
-      }
-      if (json.done) {
-        finish = json.done_reason ?? "stop"
-        // the closing object carries eval counts (tokens) and durations (ns)
-        if (json.prompt_eval_count || json.eval_count) {
-          usage = {
-            promptTokens: json.prompt_eval_count ?? undefined,
-            completionTokens: json.eval_count ?? undefined,
-            genMs: json.eval_duration
-              ? Math.round(json.eval_duration / 1e6)
-              : undefined,
-          }
+    }
+    if (json.done) {
+      finish = json.done_reason ?? "stop"
+      // the closing object carries eval counts (tokens) and durations (ns)
+      if (json.prompt_eval_count || json.eval_count) {
+        usage = {
+          promptTokens: json.prompt_eval_count ?? undefined,
+          completionTokens: json.eval_count ?? undefined,
+          genMs: json.eval_duration
+            ? Math.round(json.eval_duration / 1e6)
+            : undefined,
         }
       }
     }
   }
+  // an empty reply is fine; an empty reply out of unreadable frames is not
+  if (parseFailures && !sawEvent)
+    throw new Error(
+      `The provider sent an unreadable stream (${parseFailures} malformed ${parseFailures === 1 ? "line" : "lines"}) — try again`,
+    )
   yield { type: "done", finish, usage }
 }

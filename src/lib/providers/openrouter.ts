@@ -8,6 +8,7 @@ import type {
 } from "@/lib/types"
 import { getSettings } from "@/stores/settings"
 import { cleanKey } from "@/lib/utils"
+import { streamLines } from "./stream"
 
 const BASE = "https://openrouter.ai/api/v1"
 
@@ -170,80 +171,87 @@ export async function* streamOpenRouter(
     throw new Error(msg)
   }
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buf = ""
   const toolAcc = new Map<number, { id: string; name: string; args: string }>()
   let finish: string | undefined
   let usage: Usage | undefined
+  // a stream that parsed as nothing at all is a failure, not an empty reply
+  let parseFailures = 0
+  let sawEvent = false
 
   const flushToolCalls = (): WireToolCall[] =>
     [...toolAcc.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([, c]) => ({ id: c.id, name: c.name, args: c.args || "{}" }))
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buf += decoder.decode(value, { stream: true })
-    const lines = buf.split("\n")
-    buf = lines.pop() ?? ""
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith(":")) continue
-      if (!trimmed.startsWith("data:")) continue
-      const payload = trimmed.slice(5).trim()
-      if (payload === "[DONE]") continue
-      let json: any
-      try {
-        json = JSON.parse(payload)
-      } catch {
-        continue
-      }
-      if (json.error) throw new Error(json.error.message ?? "Provider error")
-      // usage rides on the last chunk, whose choices array may be empty —
-      // grab it before the choice guard below
-      if (json.usage) {
-        const u = json.usage
-        // BYOK requests split billing: `cost` is OpenRouter's fee, the
-        // upstream provider's charge sits in cost_details
-        const upstream = u.cost_details?.upstream_inference_cost
-        const cost =
-          typeof u.cost === "number" || typeof upstream === "number"
-            ? (u.cost ?? 0) + (upstream ?? 0)
-            : undefined
-        usage = {
-          promptTokens: u.prompt_tokens ?? undefined,
-          completionTokens: u.completion_tokens ?? undefined,
-          reasoningTokens:
-            u.completion_tokens_details?.reasoning_tokens || undefined,
-          cachedTokens: u.prompt_tokens_details?.cached_tokens || undefined,
-          cost,
-        }
-      }
-      const choice = json.choices?.[0]
-      if (!choice) continue
-      const delta = choice.delta ?? {}
-      if (typeof delta.reasoning === "string" && delta.reasoning)
-        yield { type: "reasoning", text: delta.reasoning }
-      if (typeof delta.content === "string" && delta.content)
-        yield { type: "text", text: delta.content }
-      for (const img of delta.images ?? []) {
-        const url = img?.image_url?.url
-        if (url) yield { type: "image", dataUrl: url }
-      }
-      for (const tc of delta.tool_calls ?? []) {
-        const idx = tc.index ?? 0
-        const acc = toolAcc.get(idx) ?? { id: "", name: "", args: "" }
-        if (tc.id) acc.id = tc.id
-        if (tc.function?.name) acc.name = tc.function.name
-        if (tc.function?.arguments) acc.args += tc.function.arguments
-        toolAcc.set(idx, acc)
-      }
-      if (choice.finish_reason) finish = choice.finish_reason
+  for await (const line of streamLines(res.body, req.signal)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith(":")) continue
+    if (!trimmed.startsWith("data:")) continue
+    const payload = trimmed.slice(5).trim()
+    if (payload === "[DONE]") continue
+    let json: any
+    try {
+      json = JSON.parse(payload)
+    } catch {
+      parseFailures++
+      continue
     }
+    if (json.error) throw new Error(json.error.message ?? "Provider error")
+    // usage rides on the last chunk, whose choices array may be empty —
+    // grab it before the choice guard below
+    if (json.usage) {
+      const u = json.usage
+      // BYOK requests split billing: `cost` is OpenRouter's fee, the
+      // upstream provider's charge sits in cost_details
+      const upstream = u.cost_details?.upstream_inference_cost
+      const cost =
+        typeof u.cost === "number" || typeof upstream === "number"
+          ? (u.cost ?? 0) + (upstream ?? 0)
+          : undefined
+      usage = {
+        promptTokens: u.prompt_tokens ?? undefined,
+        completionTokens: u.completion_tokens ?? undefined,
+        reasoningTokens:
+          u.completion_tokens_details?.reasoning_tokens || undefined,
+        cachedTokens: u.prompt_tokens_details?.cached_tokens || undefined,
+        cost,
+      }
+    }
+    const choice = json.choices?.[0]
+    if (!choice) continue
+    const delta = choice.delta ?? {}
+    if (typeof delta.reasoning === "string" && delta.reasoning) {
+      sawEvent = true
+      yield { type: "reasoning", text: delta.reasoning }
+    }
+    if (typeof delta.content === "string" && delta.content) {
+      sawEvent = true
+      yield { type: "text", text: delta.content }
+    }
+    for (const img of delta.images ?? []) {
+      const url = img?.image_url?.url
+      if (url) {
+        sawEvent = true
+        yield { type: "image", dataUrl: url }
+      }
+    }
+    for (const tc of delta.tool_calls ?? []) {
+      sawEvent = true
+      const idx = tc.index ?? 0
+      const acc = toolAcc.get(idx) ?? { id: "", name: "", args: "" }
+      if (tc.id) acc.id = tc.id
+      if (tc.function?.name) acc.name = tc.function.name
+      if (tc.function?.arguments) acc.args += tc.function.arguments
+      toolAcc.set(idx, acc)
+    }
+    if (choice.finish_reason) finish = choice.finish_reason
   }
 
+  // an empty reply is fine; an empty reply out of unreadable frames is not
+  if (parseFailures && !sawEvent)
+    throw new Error(
+      `The provider sent an unreadable stream (${parseFailures} malformed ${parseFailures === 1 ? "line" : "lines"}) — try again`,
+    )
   if (finish === "tool_calls" && toolAcc.size)
     yield { type: "tool_calls", calls: flushToolCalls() }
   yield { type: "done", finish, usage }

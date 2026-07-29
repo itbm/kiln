@@ -95,6 +95,47 @@ const questionsResp = sse([
   chunk({}, "stop"),
 ])
 
+// An HTML artefact that tries to read the API keys out of localStorage, the
+// way a page written by a prompt-injected model would. It must come back
+// SAFE wherever it renders: sandboxed with no allow-same-origin, the storage
+// read throws. The double quotes inside the script are deliberate — they ride
+// through the srcdoc attribute and catch any escaping mistake there.
+const htmlArtifactResp = sse([
+  chunk({ content: "Here you go:\n\n" }),
+  chunk({
+    content:
+      '<artifact identifier="little-page" type="text/html" title="Little page">\n' +
+      '<h1 id="h">Hello</h1><div id="probe">pending</div>\n' +
+      "<script>try{localStorage.getItem(\"amber-settings\");" +
+      'document.getElementById("probe").textContent="LEAK"}' +
+      'catch(e){document.getElementById("probe").textContent="SAFE"}' +
+      'document.getElementById("h").dataset.ran="1"</script>\n',
+  }),
+  chunk({ content: "</artifact>\n\nTap it to open." }),
+  chunk({}, "stop"),
+])
+
+// Tool call whose arguments are truncated mid-JSON — the model must be told
+// so it can retry, not have an invented empty call run on its behalf
+const badArgsResp = sse([
+  chunk({ role: "assistant", content: "" }),
+  chunk({
+    tool_calls: [
+      {
+        index: 0,
+        id: "call_bad",
+        function: { name: "web_search", arguments: '{"query": ' },
+      },
+    ],
+  }),
+  chunk({}, "tool_calls"),
+])
+
+// Frames that never parse. Ending this as a successful empty reply is the
+// bug; it has to surface as an error.
+const corruptResp =
+  "data: {nope\n\ndata: {also-bad\n\ndata: {still-broken\n\ndata: [DONE]\n\n"
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
 })
@@ -163,6 +204,8 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
   const isSadNews =
     typeof lastUser?.content === "string" &&
     lastUser.content.includes("sad news")
+  const said = (s) =>
+    typeof lastUser?.content === "string" && lastUser.content.includes(s)
   const hasToolResult = body.messages?.some((m) => m.role === "tool")
   const payload = isTitle
     ? titleResp
@@ -172,9 +215,15 @@ await page.route("**/openrouter.ai/api/v1/chat/completions", async (route) => {
         ? questionsResp
         : isSadNews
           ? sadResp
-          : hasToolResult
-            ? round2
-            : round1
+          : said("Make me a little web page")
+            ? htmlArtifactResp
+            : said("break the tool call") && !hasToolResult
+              ? badArgsResp
+              : said("corrupt the stream")
+                ? corruptResp
+                : hasToolResult
+                  ? round2
+                  : round1
   await route.fulfill({
     status: 200,
     headers: { "content-type": "text/event-stream" },
@@ -195,7 +244,15 @@ await page.route("**/api.tavily.com/search", (route) =>
 )
 
 const errors = []
-page.on("pageerror", (e) => errors.push(e.message))
+// The artefact probe below deliberately reaches for localStorage from inside
+// the sandbox. Chromium's refusal is the result we're testing for, so it is
+// counted rather than treated as a page error.
+const sandboxDenials = []
+page.on("pageerror", (e) => {
+  if (/sandboxed and lacks the 'allow-same-origin' flag/.test(e.message))
+    sandboxDenials.push(e.message)
+  else errors.push(e.message)
+})
 
 const assertTrue = (cond, msg) => {
   if (!cond) {
@@ -205,6 +262,15 @@ const assertTrue = (cond, msg) => {
 }
 
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" })
+
+// --- the security headers the app ships with are actually served ---
+// (vite preview mirrors deploy/nginx.conf, so a policy that broke something
+// fails here rather than after a deploy)
+const shellHeaders = (await page.request.get(`${BASE}/`)).headers()
+assertTrue(
+  (shellHeaders["content-security-policy"] ?? "").includes("object-src 'none'"),
+  "Content-Security-Policy served with the app shell",
+)
 
 // --- Pip stays on screen when the opening sidebar clobbers him ---
 // He idles on the home ring (screen centre), squarely in the drawer's
@@ -260,6 +326,14 @@ await usageDetail.waitFor({ timeout: 5000 })
 console.log("ok: caption expands to the full token breakdown")
 await usageDetail.click() // collapse again
 await page.screenshot({ path: "shots/e2e-stream-result.png" })
+
+// Auto-compaction looks at every send, and on this tiny 700-token context it
+// finds nothing to summarise for a while — a normal outcome of looking, which
+// must not surface as a failure. (It used to, which only a screenshot caught.)
+assertTrue(
+  (await page.getByText("Auto-compaction failed").count()) === 0,
+  "no compaction warning when there was simply nothing to compact",
+)
 
 // artifact viewer opens with rendered markdown
 await page.getByText("Espresso beans — quick guide").click()
@@ -840,6 +914,90 @@ assertTrue(
 )
 await page.keyboard.press("Escape")
 await page.waitForTimeout(600)
+
+// --- an HTML artefact can never reach the app's own storage ---
+// Opening one used to put model-written markup at the top level of a blob:
+// URL, which is same-origin with Kiln: its scripts could read the API keys
+// out of localStorage and every chat out of IndexedDB. A page fetched by the
+// web_fetch tool only had to talk the model into writing one.
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await composer.fill("Make me a little web page")
+await page.getByLabel("Send").click()
+await page.getByText("Little page").waitFor({ timeout: 20000 })
+await page.getByText("Little page").click()
+await page.getByRole("tab", { name: "Source" }).waitFor({ timeout: 5000 })
+
+// the preview frame: sandboxed, so the storage read throws — and the script
+// still runs, which is what proves the CSP above didn't muzzle artefacts
+const previewFrame = page.frameLocator("iframe[sandbox]")
+await previewFrame.locator("#probe").filter({ hasText: "SAFE" }).waitFor({ timeout: 5000 })
+console.log("ok: artefact preview is sandboxed away from localStorage")
+await previewFrame.locator("h1[data-ran='1']").waitFor({ timeout: 5000 })
+console.log("ok: artefact scripts still run under the CSP")
+
+// the opened tab: our own wrapper, artefact nested inside a sandboxed frame
+const popupPromise = ctx.waitForEvent("page")
+await page.getByRole("button", { name: "Open" }).click()
+const popup = await popupPromise
+await popup.waitForLoadState()
+assertTrue(popup.url().startsWith("blob:"), "artefact opens in a blob document")
+assertTrue(
+  (await popup.evaluate(() => window.opener)) === null,
+  "the opened tab cannot reach back through window.opener",
+)
+const sandboxAttr = await popup.locator("iframe").getAttribute("sandbox")
+assertTrue(
+  typeof sandboxAttr === "string" && !sandboxAttr.includes("allow-same-origin"),
+  `opened artefact is nested in a sandboxed frame (sandbox="${sandboxAttr}")`,
+)
+await popup
+  .frameLocator("iframe")
+  .locator("#probe")
+  .filter({ hasText: "SAFE" })
+  .waitFor({ timeout: 5000 })
+console.log("ok: opened artefact cannot read the stored API keys")
+assertTrue(
+  sandboxDenials.length > 0,
+  `the browser itself blocked the key read (${sandboxDenials.length} refusals)`,
+)
+await popup.close()
+await page.keyboard.press("Escape")
+
+// --- a tool call with malformed arguments tells the model, not runs on {} ---
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await composer.fill("Please break the tool call")
+await page.getByLabel("Send").click()
+await page.waitForTimeout(3000)
+const badArgsRound = bodies.find((b) =>
+  b.messages?.some(
+    (m) => m.role === "tool" && String(m.content).includes("not valid JSON"),
+  ),
+)
+assertTrue(
+  !!badArgsRound,
+  "malformed tool arguments come back to the model as a correctable error",
+)
+assertTrue(
+  !bodies.some((b) =>
+    b.messages?.some(
+      (m) => m.role === "tool" && String(m.content).includes("Fresh roast dates"),
+    ) && b.messages?.some((m) => String(m.content).includes("break the tool call")),
+  ),
+  "the tool never ran on arguments the model did not send",
+)
+
+// --- a stream of unreadable frames is an error, not an empty reply ---
+await page.getByLabel("Open menu").click()
+await drawer.getByText("New chat", { exact: true }).click()
+await page.waitForTimeout(400)
+await composer.fill("Now corrupt the stream")
+await page.getByLabel("Send").click()
+await page.getByText(/unreadable stream/).waitFor({ timeout: 15000 })
+console.log("ok: an unparseable stream surfaces as an error, not a silent empty reply")
 
 // --- settings: manual update check (live service worker in preview) ---
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" })

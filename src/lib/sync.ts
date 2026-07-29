@@ -86,18 +86,77 @@ export async function exportAllData(): Promise<void> {
   downloadJson(payload, `kiln-backup-${new Date().toISOString().slice(0, 10)}.json`)
 }
 
-export async function importData(file: File): Promise<number> {
-  const parsed = JSON.parse(await file.text()) as ChatExport
+function isValidChat(c: unknown): c is Chat {
+  const v = c as Chat
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof v.id === "string" &&
+    v.id.length > 0 &&
+    typeof v.title === "string" &&
+    typeof v.createdAt === "number" &&
+    typeof v.updatedAt === "number"
+  )
+}
+
+function isValidMessage(m: unknown): m is Message {
+  const v = m as Message
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof v.id === "string" &&
+    v.id.length > 0 &&
+    typeof v.chatId === "string" &&
+    (v.role === "user" || v.role === "assistant") &&
+    typeof v.content === "string" &&
+    typeof v.createdAt === "number"
+  )
+}
+
+/** Rows land straight in Dexie and are read back by every render, so a
+ *  malformed one doesn't fail here — it fails later, somewhere unrelated.
+ *  Anything that doesn't hold up is counted and left out. */
+export async function importData(
+  file: File,
+): Promise<{ chats: number; skipped: number }> {
+  let parsed: ChatExport
+  try {
+    parsed = JSON.parse(await file.text()) as ChatExport
+  } catch {
+    throw new Error("Not a Kiln export file (invalid JSON)")
+  }
   if (
     (parsed.app !== "kiln" && parsed.app !== "amber") ||
     !Array.isArray(parsed.chats)
   )
     throw new Error("Not a Kiln export file")
+  const rawChats = parsed.chats
+  const rawMessages = Array.isArray(parsed.messages) ? parsed.messages : []
+  const chats = rawChats.filter(isValidChat).map((c) => ({
+    ...c,
+    // exports predating chat kinds carry none; ghost chats were never on disk
+    kind: c.kind === "image" ? ("image" as const) : ("chat" as const),
+    temporary: undefined,
+  }))
+  const messages = rawMessages.filter(isValidMessage).map((m) => ({
+    ...m,
+    // nothing is in flight in a file — a status that says otherwise would
+    // leave the reply spinning forever
+    status:
+      m.status === "done" || m.status === "error" || m.status === "stopped"
+        ? m.status
+        : ("interrupted" as const),
+    cloudJobId: undefined,
+  }))
   await db.transaction("rw", db.chats, db.messages, async () => {
-    await db.chats.bulkPut(parsed.chats)
-    await db.messages.bulkPut(parsed.messages)
+    await db.chats.bulkPut(chats)
+    await db.messages.bulkPut(messages)
   })
-  return parsed.chats.length
+  return {
+    chats: chats.length,
+    skipped:
+      rawChats.length - chats.length + (rawMessages.length - messages.length),
+  }
 }
 
 /**

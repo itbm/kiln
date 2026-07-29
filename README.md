@@ -257,6 +257,24 @@ The compose file runs Kiln as an immutable, minimal-privilege container:
   the read-only filesystem couldn't persist anyway. Keys are dropped the
   moment a turn finishes; the reply is dropped when the phone collects it,
   or after 24 hours. It writes no logs of chat content.
+- **Artefacts never run with the app's privileges** — a model-written page is
+  rendered inside a sandboxed frame with no `allow-same-origin`, in the
+  viewer and in the tab that **Open** spawns alike, so its scripts can't
+  reach the API keys in `localStorage` or the chats in IndexedDB. Opening one
+  puts a wrapper page of Kiln's own markup at the top level and nests the
+  artefact inside it, because a `blob:` document at the top level would share
+  the app's origin. A page the model read through `web_fetch` can therefore
+  suggest an artefact, but not exfiltrate anything by way of one.
+- **A Content-Security-Policy** (`object-src 'none'`, `base-uri 'self'`,
+  `frame-ancestors 'none'`, `form-action 'self'`) backs that up; the
+  `form-action` half is inherited by artefact frames, so a page an artefact
+  renders can't post an HTML form off to a third party either.
+- **`web_fetch` on the server won't reach the container's own network** —
+  the URL comes from the model, and anything the model has read can steer
+  it, so the runner resolves the name first and refuses loopback, private,
+  link-local and other reserved addresses (re-checking after every redirect).
+  On the phone the same tool is left alone: it reaches only the network the
+  user is already on.
 
 ### The Ollama proxy
 
