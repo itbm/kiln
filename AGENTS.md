@@ -24,6 +24,7 @@ npm run build                  # type-check (tsc -b) + production build — must
 npm run preview                # serve dist/ on :4173 (needed by the three scripts below)
 node scripts/e2e-mock.mjs      # end-to-end suite against a mocked provider — must pass
 node scripts/e2e-cloud.mjs     # cloud runtime end-to-end (spawns its own runner + mock) — must pass
+node scripts/e2e-github.mjs    # on-device GitHub slice against a mocked api.github.com — must pass
 node scripts/verify-fresh.mjs  # first-run + key-gated live model fetch checks
 npm run shots                  # regenerate the screenshot set into shots/
 npm run icons                  # regenerate PWA icons from public/icons/icon.svg
