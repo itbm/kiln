@@ -397,7 +397,7 @@ function UpdatesSection() {
                   {" "}
                   <button
                     className="underline underline-offset-2 hover:text-foreground"
-                    onClick={() => reloginViaProxy()}
+                    onClick={() => void reloginViaProxy()}
                   >
                     Log in again
                   </button>
