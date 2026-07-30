@@ -82,9 +82,12 @@ export default defineConfig({
           /^\/api\//,
           /^\/splash\//,
           // Same-origin login pages of common auth gateways (oauth2-proxy,
-          // traefik-forward-auth, Authentik, Pomerium). The re-login bounce
-          // (src/lib/sw.ts) redirects through them; serving the cached app
-          // shell instead of the gateway's page would break the login flow.
+          // traefik-forward-auth, Authentik, Pomerium). reloginViaProxy
+          // (src/lib/sw.ts) drops the worker and reloads; the proxy then 302s
+          // that navigation through one of these. With the worker gone the
+          // fetch reaches the network regardless, but keeping them off the
+          // fallback means the worker that re-registers on the next boot
+          // never serves the cached shell in place of the gateway's page.
           /^\/oauth2\//,
           /^\/_oauth/,
           /^\/outpost\.goauthentik\.io\//,

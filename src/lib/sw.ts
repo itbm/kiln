@@ -141,16 +141,35 @@ export function applyUpdate(): void {
 // can't renew on its own either; the user has to be told.
 
 /**
- * Force a round trip through whatever auth proxy sits in front. Navigations
- * under /api/ are on the service worker's navigateFallbackDenylist
- * (vite.config.ts), so unlike a plain reload — which the worker serves from
- * cache without touching the network — this navigation always reaches the
- * server, giving the proxy its chance to run the login flow. Afterwards
- * nginx 302s /api/login back to /; hosts that serve the SPA fallback instead
- * land in the router, which redirects the same way (App.tsx).
+ * Recover from an expired auth-proxy (Cloudflare Access, Authelia, …) session.
+ *
+ * Once the proxy's session cookie expires the service worker keeps serving the
+ * precached app shell for every navigation, so the app never reaches the
+ * network again and the proxy never gets to run its login flow. The earlier
+ * approach navigated to /api/login — on the worker's navigateFallbackDenylist
+ * so the request would bypass the cache — but on iOS standalone PWAs the
+ * worker can still serve the cached shell for that navigation, so the app just
+ * reloaded locally instead of landing on the gateway's login page.
+ *
+ * The reliable way out is to drop the worker first. With nothing intercepting
+ * the fetch, the next navigation is a genuine network request the proxy can
+ * redirect: Cloudflare Access 302s to its cross-origin login page, iOS opens
+ * the login flow, and on return the proxy bounces back to the app. The worker
+ * then re-registers (setupServiceWorker on boot) and re-precaches on the new
+ * version — a one-time cost paid only on re-login.
  */
-export function reloginViaProxy(): void {
-  window.location.assign("/api/login")
+export async function reloginViaProxy(): Promise<void> {
+  if ("serviceWorker" in navigator) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+    } catch {
+      // Best-effort: an iOS standalone app can also cold-launch uncontrolled,
+      // in which case there's nothing to unregister and a reload already
+      // reaches the network directly.
+    }
+  }
+  window.location.reload()
 }
 
 /**
@@ -195,7 +214,7 @@ async function warnIfSessionExpired(): Promise<void> {
     id: "sw-relogin",
     duration: Infinity,
     description: "Kiln can't check for updates until you log in again.",
-    action: { label: "Log in", onClick: () => reloginViaProxy() },
+    action: { label: "Log in", onClick: () => void reloginViaProxy() },
   })
 }
 
