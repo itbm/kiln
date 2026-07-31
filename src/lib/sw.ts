@@ -159,6 +159,15 @@ export function applyUpdate(): void {
  * version — a one-time cost paid only on re-login.
  */
 export async function reloginViaProxy(): Promise<void> {
+  await hardReloadApp()
+}
+
+/**
+ * A full PWA reload: drop all service worker registrations and caches so the
+ * next load is a genuine fetch of the latest app shell, not a warm restart
+ * from a stored snapshot. This is what Settings → Reload app uses.
+ */
+export async function hardReloadApp(): Promise<void> {
   if ("serviceWorker" in navigator) {
     try {
       const regs = await navigator.serviceWorker.getRegistrations()
@@ -167,6 +176,14 @@ export async function reloginViaProxy(): Promise<void> {
       // Best-effort: an iOS standalone app can also cold-launch uncontrolled,
       // in which case there's nothing to unregister and a reload already
       // reaches the network directly.
+    }
+  }
+  if ("caches" in window) {
+    try {
+      const names = await caches.keys()
+      await Promise.all(names.map((n) => caches.delete(n)))
+    } catch {
+      // Some browsers restrict cache access in private/embedded contexts.
     }
   }
   window.location.reload()

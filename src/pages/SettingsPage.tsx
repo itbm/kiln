@@ -47,6 +47,7 @@ import { ensureNotificationPermission } from "@/lib/notify"
 import {
   applyUpdate,
   checkForUpdates,
+  hardReloadApp,
   reloginViaProxy,
   useSWUpdate,
   type UpdateCheckResult,
@@ -384,7 +385,7 @@ function UpdatesSection() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.location.reload()}
+            onClick={() => void hardReloadApp()}
           >
             <RotateCcwIcon />
             Reload app
