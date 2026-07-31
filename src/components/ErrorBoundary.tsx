@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from "react"
 import { RotateCcwIcon, TriangleAlertIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { reloadApp } from "@/lib/sw"
 
 interface State {
   error: Error | null
@@ -32,7 +33,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           {this.state.error.message}
         </pre>
         <div className="flex gap-2">
-          <Button onClick={() => window.location.reload()}>
+          <Button onClick={() => void reloadApp()}>
             <RotateCcwIcon /> Reload app
           </Button>
           <Button

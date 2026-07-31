@@ -133,6 +133,40 @@ export function applyUpdate(): void {
   else registration?.waiting?.postMessage({ type: "SKIP_WAITING" })
 }
 
+/**
+ * Drop the service worker and its Cache Storage, then reload from the network.
+ *
+ * A plain `location.reload()` is not enough for an installed PWA: the
+ * controlling worker intercepts the navigation and serves the precached
+ * shell, so the user lands on the same stale build. Unregistering first
+ * (and clearing the caches it owned) makes the next load a genuine network
+ * fetch. Chats and settings live in IndexedDB / localStorage and are left
+ * alone. The worker re-registers on the next boot via setupServiceWorker.
+ */
+export async function reloadApp(): Promise<void> {
+  if ("serviceWorker" in navigator) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+    } catch {
+      // Best-effort: an iOS standalone app can also cold-launch uncontrolled,
+      // in which case there's nothing to unregister and a reload already
+      // reaches the network directly.
+    }
+  }
+  if ("caches" in window) {
+    try {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k)))
+    } catch {
+      // Cache Storage may be unavailable in private mode; reload anyway.
+    }
+  }
+  // Replace (rather than reload) so iOS standalone PWAs don't resurrect the
+  // just-unregistered controller from the bfcache / snapshot path.
+  window.location.replace(window.location.href)
+}
+
 // Self-hosted instances often sit behind a login proxy (Cloudflare Access,
 // Authelia, …). Once its session cookie expires the update check fails — but
 // the app itself keeps loading from the service worker cache, so the only
@@ -151,25 +185,15 @@ export function applyUpdate(): void {
  * worker can still serve the cached shell for that navigation, so the app just
  * reloaded locally instead of landing on the gateway's login page.
  *
- * The reliable way out is to drop the worker first. With nothing intercepting
- * the fetch, the next navigation is a genuine network request the proxy can
- * redirect: Cloudflare Access 302s to its cross-origin login page, iOS opens
- * the login flow, and on return the proxy bounces back to the app. The worker
- * then re-registers (setupServiceWorker on boot) and re-precaches on the new
- * version — a one-time cost paid only on re-login.
+ * Dropping the worker (via reloadApp) makes the next navigation a genuine
+ * network request the proxy can redirect: Cloudflare Access 302s to its
+ * cross-origin login page, iOS opens the login flow, and on return the proxy
+ * bounces back to the app. The worker then re-registers (setupServiceWorker
+ * on boot) and re-precaches on the new version — a one-time cost paid only
+ * on re-login.
  */
 export async function reloginViaProxy(): Promise<void> {
-  if ("serviceWorker" in navigator) {
-    try {
-      const regs = await navigator.serviceWorker.getRegistrations()
-      await Promise.all(regs.map((r) => r.unregister()))
-    } catch {
-      // Best-effort: an iOS standalone app can also cold-launch uncontrolled,
-      // in which case there's nothing to unregister and a reload already
-      // reaches the network directly.
-    }
-  }
-  window.location.reload()
+  await reloadApp()
 }
 
 /**
