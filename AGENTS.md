@@ -18,13 +18,15 @@ for the feature overview; this file is about working on the code.
 ## Commands
 
 ```bash
-npm run dev                    # dev server (has /api/ollama + /api/cloud proxies)
+npm run dev                    # dev server (has /api/ollama, /api/cloud + /api/forge proxies)
 npm run cloud                  # cloud turn runner on :8090 (run beside dev/preview to see the pill)
+npm run forge                  # coding runner on :8091 (needs KILN_WORKSPACE_ROOT + an sbx daemon)
 npm run build                  # type-check (tsc -b) + production build — must pass
 npm run preview                # serve dist/ on :4173 (needed by the three scripts below)
 node scripts/e2e-mock.mjs      # end-to-end suite against a mocked provider — must pass
 node scripts/e2e-cloud.mjs     # cloud runtime end-to-end (spawns its own runner + mock) — must pass
 node scripts/e2e-github.mjs    # on-device GitHub slice against a mocked api.github.com — must pass
+node scripts/e2e-forge.mjs     # coding runtime against a mock sbx daemon + mock agent — must pass
 node scripts/verify-fresh.mjs  # first-run + key-gated live model fetch checks
 npm run shots                  # regenerate the screenshot set into shots/
 npm run icons                  # regenerate PWA icons from public/icons/icon.svg
@@ -54,6 +56,13 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   from the provider APIs, not hardcoded lists — see
   `src/lib/providers/*.ts`. When `ModelInfo` gains fields, bump
   `CACHE_VERSION` in `src/stores/models.ts` so stale caches refetch.
+- **`server/forge/` and `server/agent/` are the coding runtime.** The forge is
+  dependency-free like `cloud.mjs` — it reaches the sbx daemon with
+  `http.request({ socketPath })`, so there is nothing to install. `server/agent/`
+  is the exception that proves the rule: it needs
+  `@anthropic-ai/claude-agent-sdk`, but it runs *inside the microVM* and ships
+  as a kit, so it never enters the Kiln image. Everything uncertain about sbx
+  lives in `server/forge/sandbox.mjs` and nowhere else.
 - **`server/cloud.mjs` mirrors client code by design** (it's a
   dependency-free plain-Node file, so it can't import from `src/`): the
   provider stream parsing mirrors `src/lib/providers/*.ts`, the tool
@@ -70,6 +79,26 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   components) to stop iOS zoom-on-focus. Use `confirmDialog`/`promptDialog`
   from `src/stores/dialogs.tsx`, never `window.confirm/prompt`.
 - Edge-flush bottom surfaces use `pb-safe-plus`.
+
+## Architecture pointers — coding chats
+
+- `server/forge/` — the host-side coding runner: clones into
+  `$KILN_WORKSPACE_ROOT/<chatId>/repo` (an **encrypted mount**, see
+  `deploy/encrypted-workspace.md`), brings up an sbx microVM on it, and relays
+  `kiln-agent`'s stream into the same seq-numbered `TurnEvent` journal the
+  cloud runner uses. `git.mjs` owns clone/commit/push *and* the guard that
+  refuses to push Kiln's own state — deliberately outside the sandbox, so it
+  isn't reachable by the process it guards.
+- `server/agent/` — the resident Claude Code session inside the VM. One
+  `query()` per chat, fed from an async iterable, so many messages share one
+  session. It is what makes `canUseTool` possible, which is what turns into
+  question chips on the phone.
+- `src/lib/forge.ts` + `src/stores/forge.ts` + `runForgeRounds` in
+  `engine.ts` — a near-copy of the cloud trio. No forge → no Code chat entry
+  point, so a server without one shows no dead UI.
+- Kiln's own state is a **sibling** of the git tree (`$WS/.kiln`, with `HOME`
+  and `CLAUDE_CONFIG_DIR` inside it), never a child — that is what keeps
+  `git add -A` from reaching it. Don't "tidy" it into the repo directory.
 
 ## Parked features
 

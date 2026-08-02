@@ -26,6 +26,7 @@ import { FindBar } from "@/components/chat/FindBar"
 import { MessageView } from "@/components/chat/MessageView"
 import { ArtifactViewer } from "@/components/chat/ArtifactView"
 import { QuestionsSheet } from "@/components/chat/QuestionsSheet"
+import { replyToForgeJob } from "@/lib/forge"
 import { UsageStatsDialog } from "@/components/chat/UsageStatsDialog"
 import { Button } from "@/components/ui/button"
 import {
@@ -174,6 +175,8 @@ export default function ChatPage() {
     msg: Message
     block: QuestionsBlock
   } | null>(null)
+  /** code chats: the message carrying a question the agent is blocked on */
+  const [askFor, setAskFor] = useState<Message | null>(null)
 
   const generating = useStream((s) => (chatId ? !!s.generating[chatId] : false))
   // subscribe to live stream length so auto-scroll follows tokens
@@ -296,6 +299,21 @@ export default function ChatPage() {
     if (block) setQuestionsFor({ msg: last, block })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generating, messages])
+
+  /**
+   * A code chat's question is different in kind from a `<questions>` block:
+   * the agent is *blocked* on it, so the answer goes back to the running job
+   * rather than becoming the next user message. Clearing `ask` locally is
+   * what dismisses the chips; the turn then carries on streaming.
+   */
+  const submitAsk = async (msg: Message, answers: QAnswer[]) => {
+    if (!msg.ask || !chat) return
+    const answer = answers[0]?.answer ?? ""
+    await replyToForgeJob(msg.ask.jobId, msg.ask.requestId, answer)
+    setAskFor(null)
+    useStream.getState().update(msg.id, { ask: undefined })
+    await persistMessage({ ...msg, ask: undefined }, !!chat.temporary)
+  }
 
   const submitAnswers = async (answers: QAnswer[]) => {
     if (!questionsFor || !chat) return
@@ -532,10 +550,15 @@ export default function ChatPage() {
   // Ember chrome: wordmark on the empty home screen, model line under the title
   const isHome = !chatId && messages.length === 0
   const headerTitle = brandChrome && isHome ? "Kiln" : (chat?.title ?? "New chat")
+  // A code chat's subtitle says what it is working on rather than which
+  // model — the repository and the base → work branch pair are the facts you
+  // need to trust what it is about to push.
   const headerSubtitle =
-    brandChrome && chat && modelRef
-      ? `${displayModelName(modelRef)} · ${PROVIDER_NAMES[modelRef.provider]}`
-      : undefined
+    chat?.kind === "code" && chat.repo
+      ? `${chat.repo.owner}/${chat.repo.name} · ${chat.repo.baseBranch} → ${chat.repo.workBranch}`
+      : brandChrome && chat && modelRef
+        ? `${displayModelName(modelRef)} · ${PROVIDER_NAMES[modelRef.provider]}`
+        : undefined
 
   // index of the last message covered by the compaction summary
   const cutoff = chat?.summaryCutoff ?? 0
@@ -690,6 +713,7 @@ export default function ChatPage() {
                       onOpenQuestions={(msg, block) =>
                         setQuestionsFor({ msg, block })
                       }
+                      onOpenAsk={(msg) => setAskFor(msg)}
                     />
                     {i === lastCoveredIdx && (
                       <div
@@ -764,7 +788,12 @@ export default function ChatPage() {
               onEffortChange={setEffort}
               runtime={runtime}
               onRuntimeChange={
-                (chat?.temporary ?? (!chatId && pendingTemp))
+                // A code chat has no local counterpart — there is no shell or
+                // checkout on the device — so the Local/Cloud pill would offer
+                // a choice that doesn't exist. Temporary chats never leave the
+                // device at all.
+                (chat?.temporary ?? (!chatId && pendingTemp)) ||
+                chat?.kind === "code"
                   ? undefined
                   : (r) => void changeRuntime(r)
               }
@@ -799,6 +828,19 @@ export default function ChatPage() {
               }}
               questions={questionsFor.block.questions}
               onSubmit={(answers) => void submitAnswers(answers)}
+            />
+          )}
+          {askFor?.ask && (
+            <QuestionsSheet
+              open
+              onOpenChange={(o) => {
+                // Dismissing without answering leaves the agent blocked, which
+                // is correct: it must not read a shrug as consent. The chips
+                // stay on the message so it can be answered later.
+                if (!o) setAskFor(null)
+              }}
+              questions={askFor.ask.questions}
+              onSubmit={(answers) => void submitAsk(askFor, answers)}
             />
           )}
         </>

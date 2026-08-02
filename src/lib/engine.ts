@@ -30,6 +30,14 @@ import {
   CloudDetached,
   CloudJobGone,
 } from "./cloud"
+import {
+  attachForgeJob,
+  createForgeJob,
+  deleteForgeJob,
+  stopForgeJob,
+  ForgeDetached,
+  ForgeJobGone,
+} from "./forge"
 import { toast } from "sonner"
 import { useStream } from "@/stores/stream"
 import { useTemp } from "@/stores/temp"
@@ -412,9 +420,62 @@ async function* runCloudRounds(
 }
 
 /**
+ * Drive a coding turn that lives on the forge. Structurally identical to
+ * runCloudRounds — same replay-from-0-on-reattach, same backoff, same
+ * forward-Stop-rather-than-abort — because it is the same journal protocol
+ * one hop further out. Kept as a separate function rather than parameterised
+ * so the two can drift if the runtimes ever need to.
+ */
+async function* runForgeRounds(
+  jobId: string,
+  controller: AbortController,
+): AsyncGenerator<TurnEvent> {
+  const attach = new AbortController()
+  let graceTimer: ReturnType<typeof setTimeout> | undefined
+  const onStop = () => {
+    void stopForgeJob(jobId)
+    graceTimer = setTimeout(() => attach.abort(), 10_000)
+  }
+  if (controller.signal.aborted) onStop()
+  else controller.signal.addEventListener("abort", onStop)
+
+  try {
+    let failures = 0
+    while (true) {
+      let replayed = false
+      try {
+        for await (const entry of attachForgeJob(jobId, attach.signal)) {
+          if (!replayed) {
+            replayed = true
+            failures = 0
+            yield { t: "reset" }
+          }
+          yield entry
+          if (entry.t === "final") return
+        }
+      } catch (e) {
+        if (e instanceof ForgeJobGone) throw e
+        if (attach.signal.aborted) throw e
+        /* transient — fall through to the backoff below */
+      }
+      failures++
+      if (failures >= ATTACH_MAX_FAILURES) throw new ForgeDetached()
+      await wait(
+        ATTACH_BACKOFF_MS[Math.min(failures, ATTACH_BACKOFF_MS.length) - 1],
+        attach.signal,
+      )
+    }
+  } finally {
+    controller.signal.removeEventListener("abort", onStop)
+    clearTimeout(graceTimer)
+  }
+}
+
+/**
  * Apply a turn's events to the message: accumulate state, mirror it into the
  * live-stream store and IndexedDB, then finalise — status, usage, notify,
- * title. Local and cloud turns (including catch-up replays) all end here.
+ * title. Local, cloud and coding turns (including catch-up replays) all end
+ * here.
  */
 async function consumeTurn(
   chat: Chat,
@@ -448,12 +509,16 @@ async function consumeTurn(
   let steps: ToolStep[] = []
   let images: { id: string; dataUrl: string }[] = []
   let usage: Usage | undefined
+  /** code chats: harness session id, pushed branch, and any pending question */
+  let agentSessionId: string | undefined
+  let ask: Message["ask"]
+  let branch: Message["branch"]
   let lastPersist = Date.now()
   let finalStatus: Message["status"] = "done"
   let errorText: string | undefined
   let serverFinal: Extract<TurnEvent, { t: "final" }> | undefined
-  /** the cloud job vanished / became unreachable mid-turn */
-  let lostJob: CloudJobGone | CloudDetached | undefined
+  /** the server-side job vanished / became unreachable mid-turn */
+  let lostJob: CloudJobGone | CloudDetached | ForgeJobGone | ForgeDetached | undefined
   /** a detach leaves the job (possibly still running) collectable later */
   let keepJob = false
   /** did the event stream produce anything at all this session? */
@@ -467,6 +532,8 @@ async function consumeTurn(
     steps: steps.length ? steps.map((s) => ({ ...s })) : undefined,
     images: images.length ? [...images] : undefined,
     usage,
+    ask,
+    branch,
   })
 
   // Throttle store updates (~12fps) so long streams don't re-render per token
@@ -480,6 +547,8 @@ async function consumeTurn(
       steps: steps.map((s) => ({ ...s })),
       images: [...images],
       reasoningMs,
+      ask,
+      branch,
     })
   }
   const pushLive = (force = false) => {
@@ -545,6 +614,34 @@ async function consumeTurn(
         case "usage":
           usage = addUsage(usage, ev.usage)
           break
+        // --- code chats ---
+        case "session":
+          // The harness's own session id. Persisted on the chat rather than
+          // the message: it outlives this turn, and it is what lets a later
+          // turn resume after the agent process or the whole VM has gone.
+          agentSessionId = ev.id
+          break
+        case "ask":
+          // The agent is blocked until this is answered. Park it on the
+          // message so the sheet can render it, and force a flush — a
+          // question the user never sees is a turn that hangs.
+          ask = {
+            jobId: msg.forgeJobId ?? "",
+            requestId: ev.requestId,
+            kind: ev.kind,
+            questions: ev.questions,
+          }
+          force = true
+          break
+        case "branch":
+          branch = {
+            name: ev.name,
+            url: ev.url,
+            commits: ev.commits,
+            filesChanged: ev.filesChanged,
+          }
+          force = true
+          break
         case "final":
           serverFinal = ev
           break
@@ -563,11 +660,16 @@ async function consumeTurn(
   } catch (e) {
     if (controller.signal.aborted) {
       finalStatus = "stopped"
-    } else if (e instanceof CloudJobGone || e instanceof CloudDetached) {
+    } else if (
+      e instanceof CloudJobGone ||
+      e instanceof CloudDetached ||
+      e instanceof ForgeJobGone ||
+      e instanceof ForgeDetached
+    ) {
       // On a detach the job may still finish server-side, so keep the
       // pointer — the next resume pass collects or discards it.
       lostJob = e
-      keepJob = e instanceof CloudDetached
+      keepJob = e instanceof CloudDetached || e instanceof ForgeDetached
     } else {
       finalStatus = "error"
       errorText = e instanceof Error ? e.message : String(e)
@@ -599,19 +701,34 @@ async function consumeTurn(
   if (finalStatus === "done") feedEmotion(true)
 
   const jobId = msg.cloudJobId
+  const forgeId = msg.forgeJobId
   const finalMsg: Message = {
     ...snapshot(),
     status: finalStatus,
     error: errorText,
     cloudJobId: keepJob ? jobId : undefined,
+    forgeJobId: keepJob ? forgeId : undefined,
+    // A question only matters while there is a live turn to answer it.
+    // keepJob is exactly the case where the job may still be running
+    // server-side (a detach, resumed later), so the prompt is still real;
+    // otherwise the turn is over and chips would resolve nothing.
+    ask: keepJob ? ask : undefined,
   }
   await persistMessage(finalMsg, temporary)
-  await patchChat(chat, { updatedAt: Date.now() })
+  await patchChat(chat, {
+    updatedAt: Date.now(),
+    // Persist the harness session id so the next turn resumes this
+    // conversation rather than starting the agent from nothing.
+    ...(agentSessionId && agentSessionId !== chat.agentSessionId
+      ? { agentSessionId }
+      : {}),
+  })
   useStream.getState().end(chat.id, msg.id)
   if (!Object.keys(useStream.getState().generating).length) releaseWakeLock()
   // collected in full — the server can forget the journal (and, on error
   // or stop, anything it was still doing)
   if (jobId && !keepJob) void deleteCloudJob(jobId)
+  if (forgeId && !keepJob) void deleteForgeJob(forgeId)
 
   const preview =
     finalStatus === "error"
@@ -639,10 +756,13 @@ async function runAssistantTurn(
 ): Promise<void> {
   const temporary = !!chat.temporary
   const isImage = chat.kind === "image"
+  // A code chat always runs in a sandbox — there is no local equivalent of a
+  // shell and a checkout, so the runtime pill doesn't apply to it.
+  const isCode = chat.kind === "code"
   const modelInfo = findModel(modelRef)
   // temporary chats promise to touch nothing but this device's memory —
   // they never hand a turn to the server
-  const cloud = chat.runtime === "cloud" && !temporary
+  const cloud = chat.runtime === "cloud" && !temporary && !isCode
 
   const msg: Message = reuseMsg
     ? {
@@ -673,7 +793,33 @@ async function runAssistantTurn(
   const tools = !isImage && (modelInfo?.tools ?? true) ? getEnabledTools() : []
 
   let events: AsyncGenerator<TurnEvent>
-  if (cloud) {
+  if (isCode) {
+    try {
+      if (!chat.repo) throw new Error("This code chat has no repository")
+      const prompt = history[history.length - 1]?.content ?? ""
+      const jobId = await createForgeJob({
+        chatId: chat.id,
+        repo: chat.repo,
+        prompt,
+        attachments: history[history.length - 1]?.attachments,
+        provider: modelRef.provider,
+        model: modelRef.model,
+        // While the agent process is alive the forge ignores this and just
+        // continues the open session; it matters only after a restart.
+        resumeSessionId: chat.agentSessionId,
+        // Regenerating branches the agent's history rather than replacing it
+        // — the same semantic the version switcher already implies.
+        forkSession: !!reuseMsg,
+      })
+      msg.forgeJobId = jobId
+      await persistMessage({ ...msg }, temporary)
+      events = runForgeRounds(jobId, controller)
+    } catch (e) {
+      events = (async function* () {
+        throw e
+      })() as AsyncGenerator<TurnEvent>
+    }
+  } else if (cloud) {
     try {
       const jobId = await createCloudJob({
         modelRef,
@@ -764,6 +910,67 @@ export async function resumeCloudTurns(): Promise<void> {
     }
   } finally {
     resumeScanRunning = false
+  }
+}
+
+/**
+ * The coding equivalent of resumeCloudTurns: catch up on turns the forge may
+ * have finished while the app was away. Kept separate rather than merged
+ * because the two point at different journals and clean up different jobs;
+ * both are cheap when there's nothing to do.
+ */
+let resumeForgeScanRunning = false
+export async function resumeForgeTurns(): Promise<void> {
+  if (resumeForgeScanRunning) return
+  resumeForgeScanRunning = true
+  try {
+    const stale = await db.messages
+      .filter(
+        (m) =>
+          !!m.forgeJobId &&
+          (m.status === "streaming" ||
+            m.status === "pending" ||
+            m.status === "interrupted"),
+      )
+      .toArray()
+    if (!stale.length) return
+    const byChat = new Map<string, Message[]>()
+    for (const m of stale) byChat.set(m.chatId, [...(byChat.get(m.chatId) ?? []), m])
+    for (const [chatId, msgs] of byChat) {
+      if (useStream.getState().generating[chatId]) continue
+      const chat = await db.chats.get(chatId)
+      const all = chat ? await chatMessages(chatId) : []
+      const last = all[all.length - 1]
+      for (const m of msgs) {
+        if (!chat || m.id !== last?.id) {
+          void deleteForgeJob(m.forgeJobId!)
+          if (chat)
+            await db.messages.update(m.id, {
+              forgeJobId: undefined,
+              ask: undefined,
+              ...(m.status === "interrupted"
+                ? {}
+                : {
+                    status: m.content ? "interrupted" : "error",
+                    error: m.content ? undefined : "Interrupted before any output",
+                  }),
+            })
+          continue
+        }
+        const resumed: Message = { ...m, status: "streaming" }
+        await persistMessage(resumed, false)
+        const controller = useStream.getState().begin(chat.id, resumed.id)
+        void consumeTurn(
+          chat,
+          all.slice(0, -1),
+          resumed,
+          runForgeRounds(m.forgeJobId!, controller),
+          controller,
+        )
+      }
+    }
+  } finally {
+    resumeForgeScanRunning = false
   }
 }
 

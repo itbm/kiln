@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { GenImage, ToolStep } from "@/lib/types"
+import type { GenImage, Message, ToolStep } from "@/lib/types"
 
 export interface LiveStream {
   content: string
@@ -8,6 +8,9 @@ export interface LiveStream {
   images: GenImage[]
   startedAt: number
   reasoningMs?: number
+  /** code chats: a question the agent is blocked on, and the branch it pushed */
+  ask?: Message["ask"]
+  branch?: Message["branch"]
 }
 
 interface StreamState {

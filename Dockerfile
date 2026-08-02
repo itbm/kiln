@@ -28,3 +28,18 @@ HEALTHCHECK --interval=30s --timeout=3s \
 # The runner restarts if it ever dies (chat itself never depends on it);
 # nginx stays PID 1 via exec so signals keep working.
 CMD ["/bin/sh", "-c", "(while :; do node /opt/kiln/cloud.mjs; echo '[kiln] cloud runner exited, restarting' >&2; sleep 1; done) & exec nginx -g 'daemon off;'"]
+
+# ---- coding runner (opt-in, separate container) ----
+# Dependency-free like server/cloud.mjs — it speaks to the sbx daemon over a
+# Unix socket with node:http — so there is no install step. git is the only
+# addition: the forge owns clone/commit/push so the push guard sits outside
+# the process it is guarding.
+FROM node:22-alpine AS forge
+RUN apk add --no-cache git
+WORKDIR /opt/kiln
+COPY server/forge/ ./forge/
+# Not root: this service handles repositories and tokens.
+RUN addgroup -S kiln && adduser -S -G kiln kiln
+USER kiln
+EXPOSE 8091
+CMD ["node", "/opt/kiln/forge/index.mjs"]

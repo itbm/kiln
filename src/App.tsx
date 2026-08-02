@@ -7,10 +7,11 @@ import { useApplyTheme, useAppTheme, useIsDark } from "@/hooks/use-theme"
 import { PipCanvas } from "@/pip/PipCanvas"
 import { useSettings } from "@/stores/settings"
 import { recoverInterrupted } from "@/lib/db"
-import { resumeCloudTurns } from "@/lib/engine"
+import { resumeCloudTurns, resumeForgeTurns } from "@/lib/engine"
 import { clearBadge } from "@/lib/notify"
 import { requestPersistentStorage, setupServiceWorker } from "@/lib/sw"
 import { useCloud } from "@/stores/cloud"
+import { useForge } from "@/stores/forge"
 import { useModels } from "@/stores/models"
 import ArtefactsPage from "@/pages/ArtefactsPage"
 import ChatPage from "@/pages/ChatPage"
@@ -32,8 +33,14 @@ export default function App() {
       }
       // recover local casualties first, then collect what the cloud runner
       // finished (or is still generating) while the app was away
-      void recoverInterrupted().then(() => resumeCloudTurns())
+      void recoverInterrupted().then(() => {
+        void resumeCloudTurns()
+        void resumeForgeTurns()
+      })
       void useCloud.getState().probe()
+      // no forge → no Code chat entry point, so a server without one shows
+      // no dead UI
+      void useForge.getState().probe()
       void useModels.getState().refresh()
       void requestPersistentStorage()
     }
@@ -44,11 +51,15 @@ export default function App() {
       if (document.visibilityState === "visible") {
         clearBadge()
         // an iOS PWA is frozen rather than reloaded — coming back to the
-        // foreground is the moment to catch up on cloud turns
+        // foreground is the moment to catch up on server-side turns
         void resumeCloudTurns()
+        void resumeForgeTurns()
       }
     }
-    const onOnline = () => void resumeCloudTurns()
+    const onOnline = () => {
+      void resumeCloudTurns()
+      void resumeForgeTurns()
+    }
     document.addEventListener("visibilitychange", onVisible)
     window.addEventListener("online", onOnline)
     return () => {

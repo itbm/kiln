@@ -5,6 +5,7 @@ import {
   CloudUploadIcon,
   DownloadIcon,
   GhostIcon,
+  GitBranchIcon,
   ImageIcon,
   MoonIcon,
   MoreHorizontalIcon,
@@ -33,11 +34,13 @@ import { useIsDark } from "@/hooks/use-theme"
 import { deleteChat, db, searchMessages, type SearchHit } from "@/lib/db"
 import { clearDraft } from "@/lib/drafts"
 import { exportChatFile, uploadChatToServer } from "@/lib/sync"
-import type { Chat } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import type { Chat, CodeRepo } from "@/lib/types"
+import { cn, uid } from "@/lib/utils"
 import { confirmDialog, promptDialog } from "@/stores/dialogs"
 import { useSettings } from "@/stores/settings"
 import { useTemp } from "@/stores/temp"
+import { useForge } from "@/stores/forge"
+import { RepoPicker } from "@/components/chat/RepoPicker"
 
 /** Pinned chats sit above the ghosts, which sit above the day buckets. */
 const GROUP_ORDER = [
@@ -140,6 +143,9 @@ function ChatRow({
           {chat.kind === "image" && (
             <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
           )}
+          {chat.kind === "code" && (
+            <GitBranchIcon className="size-3.5 shrink-0 text-muted-foreground" />
+          )}
           <span className="truncate text-[13.5px]">{chat.title}</span>
           {draft && !hit && (
             <PencilLineIcon
@@ -232,10 +238,37 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const isDark = useIsDark()
   const setSettings = useSettings((s) => s.set)
   const theme = useSettings((s) => s.theme)
+  const forgeAvailable = useForge((s) => s.available)
+  const hasToken = useSettings((s) => !!s.githubToken)
+  const lastModel = useSettings((s) => s.lastModel)
+  const [repoPickerOpen, setRepoPickerOpen] = useState(false)
 
   const go = (path: string) => {
     navigate(path)
     onNavigate?.()
+  }
+
+  /**
+   * A code chat is an ordinary chat that carries a repository, so everything
+   * downstream — history, search, export, the version switcher — works on it
+   * unchanged. The model comes from the same last-used setting as any chat;
+   * the sandbox turns it into ANTHROPIC_MODEL.
+   */
+  const startCodeChat = async (repo: CodeRepo) => {
+    const id = uid()
+    const now = Date.now()
+    await db.chats.add({
+      id,
+      kind: "code",
+      title: `${repo.owner}/${repo.name}`,
+      createdAt: now,
+      updatedAt: now,
+      repo,
+      provider: lastModel?.provider,
+      model: lastModel?.model,
+      titleIsManual: true, // named after the repo; don't let a model rename it
+    })
+    go(`/chat/${id}`)
   }
 
   // full-text search over message content (debounced)
@@ -297,6 +330,18 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="space-y-0.5 px-2 pt-2">
+        {/* Coding needs a sandbox on the server and a GitHub token on the
+            device. Without both there is nothing this button could do, so it
+            isn't shown — same rule as the Local/Cloud pill. */}
+        {forgeAvailable && hasToken && (
+          <button
+            onClick={() => setRepoPickerOpen(true)}
+            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium hover:bg-accent/60"
+          >
+            <GitBranchIcon className="size-4 text-muted-foreground" />
+            New code chat
+          </button>
+        )}
         {(
           [
             { path: "/", label: "New chat", icon: SquarePenIcon, exact: true },
@@ -396,6 +441,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           {isDark ? <SunIcon /> : <MoonIcon />}
         </Button>
       </div>
+
+      <RepoPicker
+        open={repoPickerOpen}
+        onOpenChange={setRepoPickerOpen}
+        onSelect={(repo) => void startCodeChat(repo)}
+      />
     </div>
   )
 }

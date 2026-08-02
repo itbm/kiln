@@ -170,6 +170,25 @@ export interface Message {
    * presence marks a turn that may still be running in a sandbox.
    */
   forgeJobId?: string
+  /**
+   * Code chats: a question the agent is waiting on before it can continue.
+   * Present only while it is unanswered — the tool call is blocked
+   * server-side until it clears, so an unanswered prompt never reads as
+   * consent. Rendered by the same QuestionsSheet as `<questions>` blocks.
+   */
+  ask?: {
+    jobId: string
+    requestId: string
+    kind: "permission" | "question"
+    questions: QuestionSpec[]
+  }
+  /** Code chats: the branch this turn pushed, rendered as a card. */
+  branch?: {
+    name: string
+    url: string
+    commits: number
+    filesChanged: number
+  }
   /** provider-reported tokens/cost for the active generation */
   usage?: Usage
   /** the user has submitted answers to this message's <questions> block */

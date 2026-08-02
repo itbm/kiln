@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie"
 import { contentWithoutArtifacts } from "./artifacts"
+import { deleteForgeWorkspace } from "./forge"
 import type { Chat, Draft, Message } from "./types"
 
 class KilnDB extends Dexie {
@@ -44,11 +45,17 @@ export async function recoverInterrupted(): Promise<void> {
 }
 
 export async function deleteChat(chatId: string): Promise<void> {
+  const chat = await db.chats.get(chatId)
   await db.transaction("rw", db.chats, db.messages, db.drafts, async () => {
     await db.messages.where("chatId").equals(chatId).delete()
     await db.drafts.delete(chatId)
     await db.chats.delete(chatId)
   })
+  // A code chat owns a sandbox and a checkout on the server. Best-effort by
+  // design: the alternative is blocking a delete the user asked for on a
+  // server that may not be reachable, and the forge reaps idle workspaces
+  // anyway.
+  if (chat?.kind === "code") void deleteForgeWorkspace(chatId)
 }
 
 export async function chatMessages(chatId: string): Promise<Message[]> {

@@ -17,3 +17,38 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  # ---- coding sandbox runner (opt-in) ----
+  # `docker compose --profile forge up -d`
+  #
+  # This is the one Kiln component that is NOT read-only and NOT
+  # capability-dropped: a git checkout is a filesystem, so it needs somewhere
+  # to write. Keeping it a separate service means the hardened image above is
+  # unchanged for anyone who doesn't enable coding.
+  kiln-forge:
+    profiles: ["forge"]
+    build:
+      context: .
+      target: forge
+    container_name: kiln-forge
+    restart: unless-stopped
+    # The sbx daemon publishes each sandbox's agent port on the host's
+    # loopback, and the forge has to reach it there.
+    network_mode: host
+    environment:
+      # Must be an ENCRYPTED mount: repositories and full agent transcripts are
+      # written here. See deploy/encrypted-workspace.md.
+      KILN_WORKSPACE_ROOT: ${KILN_WORKSPACE_ROOT:?set this to an encrypted mount}
+      KILN_SBX_SOCKET: ${KILN_SBX_SOCKET:-/run/sbx/sandboxd.sock}
+      KILN_SBX_TOKEN_FILE: /run/secrets/sbx-token
+      PORT: "8091"
+    volumes:
+      # Bind at the SAME path inside and out: sbx mounts a workspace at its
+      # exact host path, so the forge must name the path sbx will see.
+      - ${KILN_WORKSPACE_ROOT}:${KILN_WORKSPACE_ROOT}
+      - ${KILN_SBX_SOCKET:-/run/sbx/sandboxd.sock}:${KILN_SBX_SOCKET:-/run/sbx/sandboxd.sock}
+      - ${KILN_SBX_TOKEN_FILE:-./sbx-token}:/run/secrets/sbx-token:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

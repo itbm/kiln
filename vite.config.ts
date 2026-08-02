@@ -118,6 +118,11 @@ export default defineConfig({
       "/api/cloud": {
         target: `http://127.0.0.1:${process.env.KILN_CLOUD_PORT ?? 8090}`,
       },
+      // The coding runner — run `npm run forge` alongside dev. Without it the
+      // probe fails quietly and the Code chat entry point stays hidden.
+      "/api/forge": {
+        target: `http://127.0.0.1:${process.env.KILN_FORGE_PORT ?? 8091}`,
+      },
     },
   },
   preview: {
@@ -130,6 +135,11 @@ export default defineConfig({
       },
       "/api/cloud": {
         target: `http://127.0.0.1:${process.env.KILN_CLOUD_PORT ?? 8090}`,
+      },
+      // The coding runner — run `npm run forge` alongside dev. Without it the
+      // probe fails quietly and the Code chat entry point stays hidden.
+      "/api/forge": {
+        target: `http://127.0.0.1:${process.env.KILN_FORGE_PORT ?? 8091}`,
       },
     },
   },

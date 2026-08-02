@@ -23,6 +23,7 @@ import { MarkdownView } from "./MarkdownView"
 import { ReasoningBlock } from "./ReasoningBlock"
 import { ToolStepView } from "./ToolStepView"
 import { ArtifactCard } from "./ArtifactView"
+import { BranchCard } from "./BranchCard"
 import { QuestionsCard } from "./QuestionsSheet"
 import type { QuestionsBlock } from "@/lib/questions"
 import { Button } from "@/components/ui/button"
@@ -206,6 +207,7 @@ export const MessageView = memo(function MessageView({
   onEditUser,
   onSwitchVersion,
   onOpenQuestions,
+  onOpenAsk,
 }: {
   msg: Message
   busy?: boolean
@@ -217,6 +219,8 @@ export const MessageView = memo(function MessageView({
   onEditUser?: (msg: Message, text: string) => void
   onSwitchVersion?: (msg: Message, target: number) => void
   onOpenQuestions?: (msg: Message, block: QuestionsBlock) => void
+  /** code chats: the agent is blocked on a question — open the chips for it */
+  onOpenAsk?: (msg: Message) => void
 }) {
   const live = useStream((s) => s.live[msg.id])
 
@@ -229,9 +233,14 @@ export const MessageView = memo(function MessageView({
   const reasoning = live?.reasoning ?? msg.reasoning ?? ""
   const steps = live?.steps ?? msg.steps ?? []
   const images = live?.images ?? msg.images ?? []
+  // Code chats: the branch this turn pushed, and any question the agent is
+  // blocked on. Both come from the live snapshot first so they appear the
+  // moment they stream, not only once the turn is persisted.
+  const branch = live?.branch ?? msg.branch
+  const ask = live?.ask ?? msg.ask
   const streaming = !!live
   const waiting =
-    streaming && !content && !reasoning && !steps.length && !images.length
+    streaming && !content && !reasoning && !steps.length && !images.length && !ask
   const segments = splitContent(content)
   const nVersions = versionCount(msg)
   const vIndex = activeVersionIndex(msg)
@@ -296,6 +305,14 @@ export const MessageView = memo(function MessageView({
           ))}
         </div>
       )}
+      {ask && (
+        <QuestionsCard
+          block={{ questions: ask.questions, complete: true }}
+          answered={false}
+          onOpen={() => onOpenAsk?.(msg)}
+        />
+      )}
+      {branch && <BranchCard branch={branch} />}
       {streaming && content && (
         <span className="ml-0.5 inline-block size-2.5 rounded-full bg-primary streaming-dot" />
       )}
