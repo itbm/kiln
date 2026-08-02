@@ -27,6 +27,7 @@ node scripts/e2e-mock.mjs      # end-to-end suite against a mocked provider — 
 node scripts/e2e-cloud.mjs     # cloud runtime end-to-end (spawns its own runner + mock) — must pass
 node scripts/e2e-github.mjs    # on-device GitHub slice against a mocked api.github.com — must pass
 node scripts/e2e-forge.mjs     # coding runtime against a mock sbx daemon + mock agent — must pass
+node scripts/e2e-sbx-contract.mjs  # the sbx driver's requests vs the published API — must pass
 node scripts/verify-fresh.mjs  # first-run + key-gated live model fetch checks
 npm run shots                  # regenerate the screenshot set into shots/
 npm run icons                  # regenerate PWA icons from public/icons/icon.svg
@@ -62,7 +63,11 @@ Playwright uses the preinstalled Chromium at `/opt/pw-browsers/chromium`
   is the exception that proves the rule: it needs
   `@anthropic-ai/claude-agent-sdk`, but it runs *inside the microVM* and ships
   as a kit, so it never enters the Kiln image. Everything uncertain about sbx
-  lives in `server/forge/sandbox.mjs` and nowhere else.
+  lives in `server/forge/sandbox.mjs` and nowhere else — and because sbx
+  cannot run in CI (it binds to the platform hypervisor and has no software
+  emulation, so QEMU is not a fallback), `scripts/e2e-sbx-contract.mjs` checks
+  that driver's requests against the published API instead. Update the spec
+  transcription at the top of that file when sbx's API moves.
 - **`server/cloud.mjs` mirrors client code by design** (it's a
   dependency-free plain-Node file, so it can't import from `src/`): the
   provider stream parsing mirrors `src/lib/providers/*.ts`, the tool
