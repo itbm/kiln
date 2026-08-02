@@ -11,7 +11,8 @@
     "forge": "node server/forge/index.mjs",
     "icons": "node scripts/make-icons.mjs",
     "splash": "node scripts/make-splash.mjs",
-    "shots": "node scripts/screenshots.mjs"
+    "shots": "node scripts/screenshots.mjs",
+    "shots:code": "node scripts/shots-code.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",

@@ -317,6 +317,85 @@ network position, exactly as the Ollama relay does. Jobs are addressed by
 unguessable 144-bit ids and are never listable. If your Kiln is on the open
 internet, put it behind the auth proxy you already use for the app itself.
 
+### Coding chats (opt-in)
+
+Pick a GitHub repository and a branch, describe a change, and a real
+[Claude Code](https://claude.com/claude-code) agent does the work in an
+isolated [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) microVM and
+pushes it to a **new** branch. The branch you picked is read and branched from,
+never written to.
+
+| Repository | Branch | A turn running | Pushed |
+| :---: | :---: | :---: | :---: |
+| ![Repository picker](docs/screenshots/code-repo-picker.png) | ![Branch picker](docs/screenshots/code-branch-picker.png) | ![A coding turn](docs/screenshots/code-chat-streaming.png) | ![The pushed branch](docs/screenshots/code-branch-card.png) |
+
+It is a Kiln chat like any other: history, search, export, the version
+switcher and artefacts all work on it. Two things are specific to coding:
+
+- **It asks.** The agent runs with permissions on, so when it wants to do
+  something consequential the prompt arrives on your phone as a question chip
+  — the same UI the model already uses for `<questions>`. Until you answer,
+  the tool call stays blocked; dismissing the sheet is not consent.
+- **It remembers.** One agent session stays open across every message in the
+  chat, so "now add a test for that" doesn't re-read the files it just read.
+  If the microVM is reaped or the host reboots, the workspace is still on disk:
+  the sandbox is rebuilt and the session resumed, without re-cloning.
+
+| The agent asks before acting |
+| :---: |
+| ![A permission prompt as chips](docs/screenshots/code-question-sheet.png) |
+
+**No new API key.** Claude Code speaks the Anthropic Messages API and honours
+`ANTHROPIC_BASE_URL`, and both of Kiln's providers expose an
+Anthropic-compatible endpoint — OpenRouter's *Anthropic Skin*, and Ollama's
+`/v1/messages` (v0.14.0+). So the model picker you already use drives coding
+too. The one new credential is a GitHub token.
+
+Be aware of what that means, though: **every** coding turn routes Claude Code
+through a gateway, which Anthropic does not support, and tool-calling fidelity
+on small local models is patchy. Pick a strong tool-using model or expect a bad
+time.
+
+#### Running it
+
+Coding needs a sandbox host, so it ships as a separate opt-in service rather
+than in the main image:
+
+```bash
+export KILN_WORKSPACE_ROOT=/mnt/kiln-workspaces   # must be encrypted — see below
+docker compose --profile forge up -d
+```
+
+It needs `sbx` (Docker Sandboxes) on the host, which needs KVM and a
+logged-in Docker account. Without the forge the Code chat entry point simply
+doesn't appear, and if sbx is unreachable the app says so rather than hiding.
+
+#### This is the one part of Kiln that writes to the server's disk
+
+Everything else in Kiln either stays on your phone or, in Cloud mode, lives in
+the server's memory for the length of one reply. Coding cannot work that way —
+a git checkout *is* a filesystem. So for any chat you code in, the server holds:
+
+- the repository, for as long as the chat exists;
+- the agent's full session transcript — every prompt, tool call and result;
+- `HOME` for the agent: shell history, git config, package caches.
+
+The mitigation is that `KILN_WORKSPACE_ROOT` **must be an encrypted mount**;
+the forge refuses to start without one configured.
+[deploy/encrypted-workspace.md](deploy/encrypted-workspace.md) is a runbook for
+LUKS, fscrypt or ZFS. Kiln relocates `HOME` and `CLAUDE_CONFIG_DIR` inside that
+mount on purpose — left at their defaults the transcript would land on the
+microVM's own disk, outside the encryption.
+
+Credentials never travel through sbx's create-time environment, which is
+persisted to daemon metadata on disk; they reach the agent per turn over an
+authenticated loopback port and exist only in VM memory. The agent still has a
+shell and can read them, so scope the GitHub token to the repositories you
+actually want coded in.
+
+If you don't enable the `forge` profile, none of this applies and Kiln's
+"nothing touches the server" promise holds as before.
+
 ## Development
 
 ```bash
@@ -374,6 +453,15 @@ Export/Import, so a future backend can round-trip it.
   the app doesn't offer PDFs when an Ollama model is selected.
 - Keys live in localStorage: anyone with your unlocked phone and this app
   open can use them. That's the standard trade-off for serverless PWAs.
+- **Coding chats write to the server's disk** — the repository and the agent's
+  full transcript — and that is not reversible without giving up the feature.
+  An encrypted workspace mount is required, but it protects the disk at rest,
+  not a running host. See the Coding section above before enabling it.
+- **`sbx` is reverse-engineered.** Kiln drives the Docker Sandboxes daemon
+  through an API specification recovered from `docker-sbx` v0.34.0, not a
+  published contract. It can change under us. The coding runtime is tested
+  end-to-end against a mock daemon, which proves Kiln's half — the journal,
+  recovery and UI — and proves nothing about sbx's.
 
 ## Stack
 
